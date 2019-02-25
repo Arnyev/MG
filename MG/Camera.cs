@@ -11,7 +11,7 @@ namespace MG
         private static readonly Vector3 Up = new Vector3(0, 1, 0);
         private const float MovementSpeed = 20.0f;
         private const float MouseSensitivity = 0.0005f;
-        private Vector3 _position = new Vector3(0, -3, -10);
+        private Vector3 _position = new Vector3(0, 0, -10);
         private DateTime _lastComputationTime;
         private int _wPressed;
         private int _sPressed;
@@ -26,7 +26,6 @@ namespace MG
                 var z = Math.Cos(_pitchRotation) * Math.Cos(_yawRotation);
                 var x = Math.Cos(_pitchRotation) * Math.Sin(_yawRotation);
                 var y = Math.Sin(_pitchRotation);
-
                 return new Vector3((float)x, (float)y, (float)z);
             }
         }
@@ -42,27 +41,27 @@ namespace MG
 
         public Matrix4x4 GetViewMatrix()
         {
-            var zaxis = -CurrentDirection;
-            var xaxis = Vector3.Normalize(Vector3.Cross(Up, zaxis));
-            var yaxis = Vector3.Cross(zaxis, xaxis);
+            var back = -CurrentDirection;
+            var left = Vector3.Normalize(Vector3.Cross(Up, back));
+            var up = Vector3.Cross(back, left);
 
             Matrix4x4 result;
 
-            result.M11 = xaxis.X;
-            result.M12 = yaxis.X;
-            result.M13 = zaxis.X;
+            result.M11 = left.X;
+            result.M12 = up.X;
+            result.M13 = back.X;
             result.M14 = 0.0f;
-            result.M21 = xaxis.Y;
-            result.M22 = yaxis.Y;
-            result.M23 = zaxis.Y;
+            result.M21 = left.Y;
+            result.M22 = up.Y;
+            result.M23 = back.Y;
             result.M24 = 0.0f;
-            result.M31 = xaxis.Z;
-            result.M32 = yaxis.Z;
-            result.M33 = zaxis.Z;
+            result.M31 = left.Z;
+            result.M32 = up.Z;
+            result.M33 = back.Z;
             result.M34 = 0.0f;
-            result.M41 = -Vector3.Dot(xaxis, _position);
-            result.M42 = -Vector3.Dot(yaxis, _position);
-            result.M43 = -Vector3.Dot(zaxis, _position);
+            result.M41 = -Vector3.Dot(left, _position);
+            result.M42 = -Vector3.Dot(up, _position);
+            result.M43 = -Vector3.Dot(back, _position);
             result.M44 = 1.0f;
 
             return result;

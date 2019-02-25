@@ -8,24 +8,30 @@ namespace MG
     class Pipeline
     {
         private readonly Camera _camera;
+        private readonly double _fov;
+        private readonly double _near;
+        private readonly double _far;
         private readonly PictureBox _pictureBox;
         private readonly DrawableObjectsController _drawableObjectsController;
-        private readonly Matrix4x4 _perspectiveMatrix;
 
-        public Pipeline(Camera camera, double aspectRatio, double fov, double near, double far, PictureBox pictureBox, DrawableObjectsController drawableObjectsController)
+        public Pipeline(Camera camera, double fov, double near, double far, PictureBox pictureBox, DrawableObjectsController drawableObjectsController)
         {
             _camera = camera;
+            _fov = fov;
+            _near = near;
+            _far = far;
             _pictureBox = pictureBox;
             _drawableObjectsController = drawableObjectsController;
-            _perspectiveMatrix = PerspectiveMatrix(aspectRatio, fov, near, far);
         }
 
         public void Redraw()
         {
-            var viewportMatrix = GetViewportMatrix(_pictureBox.Width, _pictureBox.Height);
             var pen = Pens.Black;
+
+            var perspectiveMatrix = PerspectiveMatrix((float)_pictureBox.Width / _pictureBox.Height, _fov, _near, _far);
+            var viewportMatrix = GetViewportMatrix(_pictureBox.Width, _pictureBox.Height);
             var viewMatrix = _camera.GetViewMatrix();
-            var matrixViewProj = viewMatrix * _perspectiveMatrix;
+            var matrixViewProj = viewMatrix * perspectiveMatrix;
 
             using (var g = Graphics.FromImage(_pictureBox.Image))
             {

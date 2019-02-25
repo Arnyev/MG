@@ -18,7 +18,7 @@ namespace MG
             var bitmap = new Bitmap(pictureBox1.Width, pictureBox1.Height);
             pictureBox1.Image = bitmap;
             _camera = new Camera(pictureBox1);
-            _pipeline = new Pipeline(_camera, 16.0 / 9, Math.PI / 3, 2, 50, pictureBox1, new DrawableObjectsController(propertyGrid1, listBox1, flowLayoutPanel1));
+            _pipeline = new Pipeline(_camera, Math.PI / 3, 2, 50, pictureBox1, new DrawableObjectsController(propertyGrid1, listBox1, flowLayoutPanel1));
 
             var timer = new Timer();
             timer.Interval = 10;
