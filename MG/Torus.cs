@@ -13,16 +13,63 @@ namespace MG
         public float PositionZ { get; set; }
         public float Alpha { get; set; }
         public float Beta { get; set; }
+        public float Gamma { get; set; }
+
         public string Name { get; set; } = "Torus " + _torusNumber++;
         public int PointCountH { get; set; } = 100;
         public int PointCountV { get; set; } = 100;
 
+
         public Matrix4x4 GetModelMatrix()
         {
-            var rotate = Matrix4x4.CreateFromYawPitchRoll(Alpha, Beta, 0.0f);
-            var translation = Matrix4x4.CreateTranslation(PositionX, PositionY, PositionZ);
-            return rotate * translation;
-            //return Matrix4x4.Identity;
+            var rotate = GetXRotationMatrix(Alpha) * GetYRotationMatrix(Beta) * GetZRotationMatrix(Gamma);
+
+            rotate.M41 = PositionX;
+            rotate.M42 = PositionY;
+            rotate.M43 = PositionZ;
+            return rotate;
+        }
+
+        private static Matrix4x4 GetXRotationMatrix(float alpha)
+        {
+            var result = Matrix4x4.Identity;
+            var sina = (float)Math.Sin(alpha);
+            var cosa = (float)Math.Cos(alpha);
+
+            result.M22 = cosa;
+            result.M23 = sina;
+            result.M32 = -sina;
+            result.M33 = cosa;
+
+            return result;
+        }
+
+        private static Matrix4x4 GetYRotationMatrix(float alpha)
+        {
+            var result = Matrix4x4.Identity;
+            var sina = (float)Math.Sin(alpha);
+            var cosa = (float)Math.Cos(alpha);
+
+            result.M11 = cosa;
+            result.M13 = -sina;
+            result.M31 = sina;
+            result.M33 = cosa;
+
+            return result;
+        }
+
+        private static Matrix4x4 GetZRotationMatrix(float alpha)
+        {
+            var result = Matrix4x4.Identity;
+            var sina = (float)Math.Sin(alpha);
+            var cosa = (float)Math.Cos(alpha);
+
+            result.M11 = cosa;
+            result.M12 = sina;
+            result.M21 = -sina;
+            result.M22 = cosa;
+
+            return result;
         }
 
         public Tuple<Line[], Vector4[]> GetLines()
