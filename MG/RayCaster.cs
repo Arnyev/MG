@@ -146,7 +146,9 @@ namespace MG
 
             var r = distR + specular > 255 ? (byte)255 : (byte)(distR + specular);
             var g = distG + specular > 255 ? (byte)255 : (byte)(distG + specular);
-            var b = 30 + (byte)specular > 255 ? (byte)255 : (byte)(30 + specular);
+
+            const byte ambient = 0;
+            var b = ambient + (byte)specular > 255 ? (byte)255 : (byte)(ambient + specular);
 
             return new MyColor(r, g, b);
         }

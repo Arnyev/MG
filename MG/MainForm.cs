@@ -76,7 +76,7 @@ namespace MG
 
             _lastTimeDrawn = DateTime.Now;
             _camera.UpdatePosition();
-            Task.Run((Action)RaycastingTask);
+            Task.Factory.StartNew(RaycastingTask);
             //_pipeline.Redraw();
         }
 
@@ -100,12 +100,16 @@ namespace MG
                     lock (_lockObjectFrame)
                     {
                         if (frameNumber != _frameNumber)
+                        {
+                            bitmap.Dispose();
                             return;
+                        }
                     }
 
                     pictureBox1.Invoke(new MethodInvoker(() => CopyImage(bitmap)));
                 }
 
+                bitmap.Dispose();
                 scalingFactor /= 2;
             }
         }
@@ -124,7 +128,6 @@ namespace MG
                 new RectangleF(0, 0, bitmap.Width, bitmap.Height), GraphicsUnit.Pixel);
 
             pictureBox1.Refresh();
-            bitmap.Dispose();
         }
     }
 }
