@@ -22,6 +22,8 @@ namespace MG
             Bits = new byte[width * height * 4];
             BitsHandle = GCHandle.Alloc(Bits, GCHandleType.Pinned);
             Bitmap = new Bitmap(width, height, width * 4, PixelFormat.Format32bppArgb, BitsHandle.AddrOfPinnedObject());
+            for (int i = 0; i < width * height; i++)
+                Bits[4 * i + 3] = 255;
         }
 
         public DirectBitmap(Bitmap bitmap) : this(bitmap.Width, bitmap.Height)

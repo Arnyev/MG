@@ -39,6 +39,8 @@ namespace MG
             box.LostFocus += Box_LostFocus;
         }
 
+        public Vector4 Position => new Vector4(_position, 1.0f);
+
         public Matrix4x4 GetViewMatrix()
         {
             var back = -CurrentDirection;

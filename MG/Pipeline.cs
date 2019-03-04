@@ -12,16 +12,16 @@ namespace MG
         private readonly double _near;
         private readonly double _far;
         private readonly PictureBox _pictureBox;
-        private readonly DrawableObjectsController _drawableObjectsController;
+        private readonly ObjectsController _objectsController;
 
-        public Pipeline(Camera camera, double fov, double near, double far, PictureBox pictureBox, DrawableObjectsController drawableObjectsController)
+        public Pipeline(Camera camera, double fov, double near, double far, PictureBox pictureBox, ObjectsController objectsController)
         {
             _camera = camera;
             _fov = fov;
             _near = near;
             _far = far;
             _pictureBox = pictureBox;
-            _drawableObjectsController = drawableObjectsController;
+            _objectsController = objectsController;
         }
 
         public void Redraw()
@@ -36,7 +36,7 @@ namespace MG
             using (var g = Graphics.FromImage(_pictureBox.Image))
             {
                 g.Clear(Color.White);
-                foreach (var torus in _drawableObjectsController.DrawableObjects)
+                foreach (var torus in _objectsController.DrawableObjects)
                 {
                     var modelMatrix = torus.GetModelMatrix();
                     var mvp = modelMatrix * matrixViewProj;

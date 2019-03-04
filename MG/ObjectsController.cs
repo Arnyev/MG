@@ -1,23 +1,27 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Linq;
 using System.Numerics;
 using System.Windows.Forms;
 
 namespace MG
 {
-    class DrawableObjectsController
+    class ObjectsController
     {
         private readonly PropertyGrid _propertyGrid;
         private readonly ListBox _listBox;
-        public IReadOnlyList<IDrawableObject> DrawableObjects => _drawableObjects;
+        public IReadOnlyList<IDrawableObject> DrawableObjects => _drawableObjects.OfType<IDrawableObject>().ToList();
 
-        private readonly List<IDrawableObject> _drawableObjects = new List<IDrawableObject>();
+        private readonly List<object> _drawableObjects = new List<object>();
+        public RaycastingParameters RaycastingParameters { get; } = new RaycastingParameters();
 
-        public DrawableObjectsController(PropertyGrid propertyGrid, ListBox listBox, FlowLayoutPanel panel)
+        public ObjectsController(PropertyGrid propertyGrid, ListBox listBox, FlowLayoutPanel panel)
         {
             _propertyGrid = propertyGrid;
             _listBox = listBox;
+            _listBox.Items.Add(RaycastingParameters);
+            _drawableObjects.Add(RaycastingParameters);
             _listBox.SelectedIndexChanged += _listBox_SelectedIndexChanged;
             _listBox.DisplayMember = "Name";
             panel.Controls.Add(GetButton("Add torus", AddTorus));
