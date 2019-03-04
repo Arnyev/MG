@@ -31,7 +31,7 @@ namespace MG
             _fov = fov;
         }
 
-        public void DisplayRaycasted(RaycastingParameters parameters)
+        public void Draw(RaycastingParameters parameters)
         {
             var width = _directBitmap.Width;
             var height = _directBitmap.Height;
@@ -89,7 +89,8 @@ namespace MG
                 }
             }
 
-            AddSun(parameters, position, lightPosition, viewMatrix, s, width, aspect, height);
+            if (_directBitmap.Width > 500)
+                AddSun(parameters, position, lightPosition, viewMatrix, s, width, aspect, height);
         }
 
         private void AddSun(RaycastingParameters parameters, Vector4 position, Vector3 lightPosition, Matrix4x4 viewMatrix,
@@ -109,9 +110,9 @@ namespace MG
                 return;
 
             for (int i = -parameters.SunRadius; i <= parameters.SunRadius; i++)
-            for (int j = -parameters.SunRadius; j <= parameters.SunRadius; j++)
-                if (i * i + j * j < parameters.SunRadius * parameters.SunRadius)
-                    _directBitmap.SetPixel((int) xa + i, (int) ya + j, new MyColor(255, 255, 255));
+                for (int j = -parameters.SunRadius; j <= parameters.SunRadius; j++)
+                    if (i * i + j * j < parameters.SunRadius * parameters.SunRadius)
+                        _directBitmap.SetPixel((int)xa + i, (int)ya + j, new MyColor(255, 255, 255));
         }
 
         private static MyColor GetPixelColor(Vector3 pointPosition, Vector3 lookDirection, Vector3 lightPosition, RaycastingParameters parameters)

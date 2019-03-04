@@ -8,6 +8,7 @@ namespace MG
     class Camera
     {
         private readonly PictureBox _box;
+        private readonly MainForm _mainForm;
         private static readonly Vector3 Up = new Vector3(0, 1, 0);
         private const float MovementSpeed = 20.0f;
         private const float MouseSensitivity = 0.0005f;
@@ -30,9 +31,10 @@ namespace MG
             }
         }
 
-        public Camera(PictureBox box)
+        public Camera(PictureBox box, MainForm mainForm)
         {
             _box = box;
+            _mainForm = mainForm;
             box.MouseMove += Box_MouseMove;
             box.KeyDown += Box_KeyDown;
             box.KeyUp += Box_KeyUp;
@@ -112,11 +114,14 @@ namespace MG
             var centerY = _box.Height / 2;
             var diffX = e.X - centerX;
             var diffY = e.Y - centerY;
+            if (diffY == 0 && diffX == 0)
+                return;
 
             SetCursorInMiddle();
 
             _yawRotation -= diffX * MouseSensitivity;
             _pitchRotation += diffY * MouseSensitivity;
+            _mainForm.Redraw();
         }
 
         public void SetCursorInMiddle()
@@ -127,16 +132,19 @@ namespace MG
         private void Box_LostFocus(object sender, EventArgs e)
         {
             _wPressed = _sPressed = _aPressed = _dPressed = 0;
+            _mainForm.Redraw();
         }
 
         private void Box_KeyDown(object sender, KeyEventArgs e)
         {
             UpdateMovementDirection(e.KeyCode, 1);
+            _mainForm.Redraw();
         }
 
         private void Box_KeyUp(object sender, KeyEventArgs e)
         {
             UpdateMovementDirection(e.KeyCode, 0);
+            _mainForm.Redraw();
         }
     }
 }

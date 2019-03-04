@@ -45,7 +45,7 @@ namespace MG
         public void SetPixel(int x, int y, MyColor color)
         {
             var index = (y * Width + x) * 4;
-            if (index > Bits.Length || index < 0)
+            if (index >= Bits.Length || index < 0)
                 return;
             Bits[index] = color.B;
             Bits[index + 1] = color.G;
