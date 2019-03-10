@@ -9,7 +9,7 @@ namespace MG
     public partial class MainForm : Form
     {
         private readonly Camera _camera;
-        private readonly Pipeline _pipeline;
+        private Pipeline _pipeline;
         private readonly ObjectsController _controller;
         private DirectBitmap _bitmap;
         private Graphics _graphics;
@@ -31,9 +31,9 @@ namespace MG
 
             _camera = new Camera(pictureBox1, this);
             _controller = new ObjectsController(propertyGrid1, listBox1, flowLayoutPanel1);
-            _pipeline = new Pipeline(_camera, Fov, Near, Far, pictureBox1, _controller);
+            _pipeline = new Pipeline(_camera, Fov, Near, Far, pictureBox1, _controller, _bitmap);
 
-            var timer = new Timer { Interval = 1000 };
+            var timer = new Timer { Interval = 10 };
             timer.Tick += Timer_Tick;
             timer.Start();
 
@@ -45,6 +45,7 @@ namespace MG
             _bitmap = new DirectBitmap(pictureBox1.Width, pictureBox1.Height);
             pictureBox1.Image = _bitmap.Bitmap;
             _graphics = Graphics.FromImage(_bitmap.Bitmap);
+            _pipeline = new Pipeline(_camera, Fov, Near, Far, pictureBox1, _controller, _bitmap);
         }
 
         private void MainForm_KeyPress(object sender, KeyPressEventArgs e)
@@ -70,14 +71,15 @@ namespace MG
 
         public void Redraw(bool timered = false)
         {
-            var diff = DateTime.Now - _lastTimeDrawn;
-            if (diff.Milliseconds < 20)
-                return;
+            //var diff = DateTime.Now - _lastTimeDrawn;
+            //if (diff.Milliseconds < 10)
+            //    return;
 
             _lastTimeDrawn = DateTime.Now;
             _camera.UpdatePosition();
-            Task.Factory.StartNew(RaycastingTask);
-            //_pipeline.Redraw();
+            //Task.Factory.StartNew(RaycastingTask);
+            _pipeline.Redraw();
+            pictureBox1.Refresh();
         }
 
         private void RaycastingTask()
@@ -117,7 +119,6 @@ namespace MG
         private readonly object _lockObject = new object();
         private readonly object _lockObjectFrame = new object();
         private int _frameNumber;
-
 
         private void CopyImage(DirectBitmap bitmap)
         {

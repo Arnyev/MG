@@ -16,8 +16,8 @@ namespace MG
         public float Gamma { get; set; }
 
         public string Name { get; set; } = "Torus " + _torusNumber++;
-        public int PointCountH { get; set; } = 100;
-        public int PointCountV { get; set; } = 100;
+        public int PointCountH { get; set; } = 30;
+        public int PointCountV { get; set; } = 30;
 
 
         public Matrix4x4 GetModelMatrix()

@@ -121,7 +121,7 @@ namespace MG
 
             _yawRotation -= diffX * MouseSensitivity;
             _pitchRotation += diffY * MouseSensitivity;
-            _mainForm.Redraw();
+            //_mainForm.Redraw();
         }
 
         public void SetCursorInMiddle()
@@ -132,19 +132,19 @@ namespace MG
         private void Box_LostFocus(object sender, EventArgs e)
         {
             _wPressed = _sPressed = _aPressed = _dPressed = 0;
-            _mainForm.Redraw();
+            //_mainForm.Redraw();
         }
 
         private void Box_KeyDown(object sender, KeyEventArgs e)
         {
+            //_mainForm.Redraw();
             UpdateMovementDirection(e.KeyCode, 1);
-            _mainForm.Redraw();
         }
 
         private void Box_KeyUp(object sender, KeyEventArgs e)
         {
+            //_mainForm.Redraw();
             UpdateMovementDirection(e.KeyCode, 0);
-            _mainForm.Redraw();
         }
     }
 }
