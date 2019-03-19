@@ -60,8 +60,14 @@ namespace MG
             return new MyColor(Bits[index + 2], Bits[index + 1], Bits[index]);
         }
 
-        public void DrawLine(Point p1, Point p2, MyColor color)
+        public void DrawLine(Point p1, Point p2, MyColor color, bool addColors = false)
         {
+            if (addColors)
+            {
+                AppendLine(p1, p2, color);
+                return;
+            }
+
             var differencePoint = new Point(p2.X - p1.X, p2.Y - p1.Y);
             var octant = FindOctant(differencePoint);
 
@@ -80,7 +86,7 @@ namespace MG
 
                 if (newPointX >= 0 && newPointX < Width && newPointY >= 0 && newPointY < Height)
                 {
-                    var index = (y * Width + x) * 4;
+                    var index = (newPointY * Width + newPointX) * 4;
 
                     Bits[index] = color.B;
                     Bits[index + 1] = color.G;
@@ -97,7 +103,7 @@ namespace MG
             }
         }
 
-        public void AppendLine(Point p1, Point p2, MyColor color)
+        private void AppendLine(Point p1, Point p2, MyColor color)
         {
             var differencePoint = new Point(p2.X - p1.X, p2.Y - p1.Y);
             var octant = FindOctant(differencePoint);
@@ -119,9 +125,13 @@ namespace MG
                 {
                     var index = (newPointY * Width + newPointX) * 4;
 
-                    Bits[index] += color.B;
-                    Bits[index + 1] += color.G;
-                    Bits[index + 2] += color.R;
+                    var blue = (byte)Math.Min(255, Bits[index] + color.B);
+                    var green = (byte)Math.Min(255, Bits[index + 1] + color.G);
+                    var red = (byte)Math.Min(255, Bits[index + 2] + color.R);
+
+                    Bits[index] = blue;
+                    Bits[index + 1] = green;
+                    Bits[index + 2] = red;
                 }
 
                 if (d > 0)

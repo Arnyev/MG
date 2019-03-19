@@ -43,9 +43,9 @@ namespace MG
 
         public Vector4 Position => new Vector4(_position, 1.0f);
 
-        public Matrix4x4 GetViewMatrix()
+        public Matrix4x4 LookAt(Vector3 direction)
         {
-            var back = -CurrentDirection;
+            var back = -direction;
             var left = Vector3.Normalize(Vector3.Cross(Up, back));
             var up = Vector3.Cross(back, left);
 
@@ -69,6 +69,18 @@ namespace MG
             result.M44 = 1.0f;
 
             return result;
+
+        }
+
+        public Matrix4x4 ViewMatrix => LookAt(CurrentDirection);
+
+        public Matrix4x4 InverseViewMatrix
+        {
+            get
+            {
+                Matrix4x4.Invert(ViewMatrix, out Matrix4x4 result);
+                return result;
+            }
         }
 
         private void UpdateMovementDirection(Keys keyPressed, int valueUpDown)

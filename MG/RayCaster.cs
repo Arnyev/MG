@@ -41,7 +41,7 @@ namespace MG
                 g.Clear(Color.Black);
             }
 
-            var viewMatrix = _camera.GetViewMatrix();
+            var viewMatrix = _camera.ViewMatrix;
             Matrix4x4.Invert(viewMatrix, out var invViewMatrix);
 
             var position = _camera.Position;

@@ -1,7 +1,5 @@
 ﻿using System;
 using System.Drawing;
-using System.Drawing.Drawing2D;
-using System.Threading.Tasks;
 using System.Windows.Forms;
 
 namespace MG
@@ -10,15 +8,14 @@ namespace MG
     {
         private readonly Camera _camera;
         private Pipeline _pipeline;
-        private AnaglyphicPipeline _anaglyphicPipeline;
         private readonly ObjectsController _controller;
         private DirectBitmap _bitmap;
         private Graphics _graphics;
         private const double Fov = Math.PI / 3;
         private const double Near = 2;
         private const double Far = 100.0;
+        private const float ConeWidth = 0.15f;
         private DateTime _lastTimeDrawn;
-        private bool _isAnaglyphic;
 
         public MainForm()
         {
@@ -32,9 +29,11 @@ namespace MG
             _graphics = Graphics.FromImage(_bitmap.Bitmap);
 
             _camera = new Camera(pictureBox1, this);
-            _controller = new ObjectsController(propertyGrid1, listBox1, flowLayoutPanel1);
-            _pipeline = new Pipeline(_camera, Fov, Near, Far, pictureBox1, _controller);
-            _anaglyphicPipeline = new AnaglyphicPipeline(_camera, Fov, Near, Far, pictureBox1, _controller, _bitmap);
+            _cursor = new Cursor3D(_camera, pictureBox1, (float)Near, (float)Far);
+            _controller = new ObjectsController(propertyGrid1, listBox1, flowLayoutPanel1, _cursor);
+            _pipeline = new Pipeline(_camera, Fov, Near, Far, _controller, _bitmap, _cursor);
+
+            _manipulator = new PointManipulator(_controller, _bitmap.Width, _bitmap.Height, (float)Fov, pictureBox1, _camera,ConeWidth);
 
             var timer = new Timer { Interval = 10 };
             timer.Tick += Timer_Tick;
@@ -59,7 +58,7 @@ namespace MG
                     pictureBox1.Focus();
                     break;
                 case Keys.F2:
-                    _isAnaglyphic = !_isAnaglyphic;
+                    _pipeline.IsAnaglyphic = !_pipeline.IsAnaglyphic;
                     break;
 
             }
@@ -70,12 +69,14 @@ namespace MG
             _bitmap = new DirectBitmap(pictureBox1.Width, pictureBox1.Height);
             pictureBox1.Image = _bitmap.Bitmap;
             _graphics = Graphics.FromImage(_bitmap.Bitmap);
-            _anaglyphicPipeline = new AnaglyphicPipeline(_camera, Fov, Near, Far, pictureBox1, _controller, _bitmap);
+            _pipeline = new Pipeline(_camera, Fov, Near, Far, _controller, _bitmap, _cursor);
         }
 
         private void Timer_Tick(object sender, EventArgs e)
         {
             Redraw(true);
+            if (pictureBox1.Focused)
+                propertyGrid1.Refresh();
         }
 
         public void Redraw(bool timered = false)
@@ -87,10 +88,9 @@ namespace MG
             _lastTimeDrawn = DateTime.Now;
             _camera.UpdatePosition();
             //Task.Factory.StartNew(RaycastingTask);
-            if (_isAnaglyphic)
-                _anaglyphicPipeline.Redraw();
-            else
-                _pipeline.Redraw();
+
+            _manipulator.Update();
+            _pipeline.Redraw();
             pictureBox1.Refresh();
         }
 
@@ -131,6 +131,8 @@ namespace MG
         private readonly object _lockObject = new object();
         private readonly object _lockObjectFrame = new object();
         private int _frameNumber;
+        private Cursor3D _cursor;
+        private PointManipulator _manipulator;
 
         private void CopyImage(DirectBitmap bitmap)
         {
