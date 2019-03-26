@@ -14,7 +14,6 @@ namespace MG
         private const double Fov = Math.PI / 3;
         private const double Near = 2;
         private const double Far = 100.0;
-        private const float ConeWidth = 0.15f;
         private DateTime _lastTimeDrawn;
 
         public MainForm()
@@ -30,10 +29,10 @@ namespace MG
 
             _camera = new Camera(pictureBox1, this);
             _cursor = new Cursor3D(_camera, pictureBox1, (float)Near, (float)Far);
-            _controller = new ObjectsController(propertyGrid1, listBox1, flowLayoutPanel1, _cursor);
+            _controller = new ObjectsController(propertyGrid1, listBox1,listBox2, flowLayoutPanel1, _cursor);
             _pipeline = new Pipeline(_camera, Fov, Near, Far, _controller, _bitmap, _cursor);
 
-            _manipulator = new PointManipulator(_controller, _bitmap.Width, _bitmap.Height, (float)Fov, pictureBox1, _camera,ConeWidth);
+            _manipulator = new PointManipulator(_controller, (float)Fov, pictureBox1, _camera);
 
             var timer = new Timer { Interval = 10 };
             timer.Tick += Timer_Tick;
@@ -131,8 +130,8 @@ namespace MG
         private readonly object _lockObject = new object();
         private readonly object _lockObjectFrame = new object();
         private int _frameNumber;
-        private Cursor3D _cursor;
-        private PointManipulator _manipulator;
+        private readonly Cursor3D _cursor;
+        private readonly PointManipulator _manipulator;
 
         private void CopyImage(DirectBitmap bitmap)
         {

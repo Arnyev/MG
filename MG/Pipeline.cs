@@ -1,5 +1,7 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Drawing;
+using System.Linq;
 using System.Numerics;
 
 namespace MG
@@ -67,11 +69,12 @@ namespace MG
             var viewMatrix = _camera.ViewMatrix;
             var matrixViewProj = viewMatrix * perspectiveMatrix;
 
-            foreach (var torus in _objectsController.DrawableObjects)
+            foreach (var ob in _objectsController.DrawableObjects)
             {
-                var mvp = torus.GetModelMatrix() * matrixViewProj;
-                var k = torus.GetModelMatrix() * _camera.ViewMatrix;
-                var tuple = torus.GetLines();
+                var curve = ob as BezierCurve;
+
+                var mvp = ob.GetModelMatrix() * matrixViewProj;
+                var tuple = ob.GetLines();
                 var pointsLines = tuple.Item2;
 
                 var newPoints = new Vector4[pointsLines.Length];
@@ -81,38 +84,84 @@ namespace MG
                     newPoints[i] = transformed / transformed.W;
                 }
 
+                List<Tuple<Vector4, Vector4, bool>> linesToDraw = new List<Tuple<Vector4, Vector4, bool>>();
+
                 foreach (var line in tuple.Item1)
                 {
                     var p1 = newPoints[line.Start];
                     var p2 = newPoints[line.End];
-                    if (!(p1.X > -1) || !(p1.X < 1) || !(p1.Y > -1) || !(p1.Y < 1) || !(p1.Z > -1) || !(p1.Z < 1) ||
-                        !(p2.X > -1) || !(p2.X < 1) || !(p2.Y > -1) || !(p2.Y < 1) || !(p2.Z > -1) ||
-                        !(p2.Z < 1)) continue;
+                    bool draw = !(!(p1.X > -1) || !(p1.X < 1) || !(p1.Y > -1) || !(p1.Y < 1) || !(p1.Z > -1) || !(p1.Z < 1) ||
+                                  !(p2.X > -1) || !(p2.X < 1) || !(p2.Y > -1) || !(p2.Y < 1) || !(p2.Z > -1) ||
+                                  !(p2.Z < 1));
 
                     p1 = Vector4.Transform(p1, viewportMatrix);
                     p2 = Vector4.Transform(p2, viewportMatrix);
-                    _bitmap.DrawLine(new Point((int)p1.X, (int)p1.Y), new Point((int)p2.X, (int)p2.Y), color, shouldAppend);
+                    linesToDraw.Add(Tuple.Create(p1, p2, draw));
                 }
+
+                if (curve == null || curve.DrawLines)
+                    linesToDraw.Where(x => x.Item3).ToList().
+                        ForEach(l => _bitmap.DrawLine(new Point((int)l.Item1.X, (int)l.Item1.Y),
+                          new Point((int)l.Item2.X, (int)l.Item2.Y), color, shouldAppend));
+
+                if (curve == null || linesToDraw.Count == 0)
+                    continue;
+
+                var points = linesToDraw.Select(x => x.Item1).Concat(linesToDraw.Select(x => x.Item2)).ToList();
+                var minX = points.Min(p => p.X);
+                var maxX = points.Max(p => p.X);
+                var minY = points.Min(p => p.Y);
+                var maxY = points.Max(p => p.Y);
+                var count = (int)(maxX - minX + maxY - minY);
+
+                if (count > _bitmap.Width + _bitmap.Height)
+                    count = _bitmap.Width + _bitmap.Height;
+
+                var pointsToDraw = curve.GetPoints(count);
+
+                pointsToDraw.ForEach(x => DrawPoint(color, matrixViewProj, viewportMatrix, x));
             }
 
+            DrawPoints(color, matrixViewProj, viewportMatrix);
+        }
+
+        private void DrawPoints(MyColor color, Matrix4x4 matrixViewProj, Matrix4x4 viewportMatrix)
+        {
+            var g = Graphics.FromImage(_bitmap.Bitmap);
+            var pen = Pens.Yellow;
             foreach (var point in _objectsController.Points)
-            {
-                var transformed = Vector4.Transform(point.Point, matrixViewProj);
-                var p = transformed / transformed.W;
-                if (!(p.X > -1) || !(p.X < 1) || !(p.Y > -1) || !(p.Y < 1) || !(p.Z > -1) || !(p.Z < 1))
-                    continue;
+                DrawPoint(color, matrixViewProj, viewportMatrix, point.Point, g, pen, point, point.Selected);
 
-                var screenPoint = Vector4.Transform(p, viewportMatrix);
-                if (screenPoint.X < 2 || screenPoint.X > _bitmap.Width - 2 || screenPoint.Y < 2 ||
-                    screenPoint.Y > _bitmap.Height - 2)
-                    continue;
+            g.Dispose();
+        }
 
-                _bitmap.SetPixel((int)screenPoint.X - 1, (int)screenPoint.Y, color);
-                _bitmap.SetPixel((int)screenPoint.X, (int)screenPoint.Y + 1, color);
-                _bitmap.SetPixel((int)screenPoint.X + 1, (int)screenPoint.Y, color);
-                _bitmap.SetPixel((int)screenPoint.X, (int)screenPoint.Y - 1, color);
-                _bitmap.SetPixel((int)screenPoint.X, (int)screenPoint.Y, color);
-            }
+        private void DrawPoint(MyColor color, Matrix4x4 matrixViewProj, Matrix4x4 viewportMatrix, Vector4 point, Graphics g = null, Pen pen = null, DrawablePoint pointData = null, bool circle = false)
+        {
+            var transformed = Vector4.Transform(point, matrixViewProj);
+            var p = transformed / transformed.W;
+            if (pointData != null)
+                pointData.ScreenPosition = new Point(-100, -100);
+
+            if (!(p.X > -1) || !(p.X < 1) || !(p.Y > -1) || !(p.Y < 1) || !(p.Z > -1) || !(p.Z < 1))
+                return;
+
+            var screenPoint = Vector4.Transform(p, viewportMatrix);
+            if (screenPoint.X < 2 || screenPoint.X > _bitmap.Width - 2 || screenPoint.Y < 2 ||
+                screenPoint.Y > _bitmap.Height - 2)
+                return;
+
+            var x = (int)screenPoint.X;
+            var y = (int)screenPoint.Y;
+            _bitmap.SetPixel(x - 1, y, color);
+            _bitmap.SetPixel(x, y + 1, color);
+            _bitmap.SetPixel(x + 1, y, color);
+            _bitmap.SetPixel(x, y - 1, color);
+            _bitmap.SetPixel(x, y, color);
+
+            if (pointData != null)
+                pointData.ScreenPosition = new Point(x, y);
+            if (circle && g != null && pen != null)
+                g.DrawEllipse(pen, screenPoint.X - 5, screenPoint.Y - 5, 10, 10);
         }
 
         private static Matrix4x4 GetViewportMatrix(int width, int height)
@@ -133,14 +182,16 @@ namespace MG
 
         private static Matrix4x4 Frustrum(float left, float right, float bottom, float top, float near, float far)
         {
-            var m = new Matrix4x4();
-            m.M11 = 2 * near / (right - left);
-            m.M22 = 2 * near / (top - bottom);
-            m.M31 = (right + left) / (right - left);
-            m.M32 = (top + bottom) / (top - bottom);
-            m.M33 = -(far + near) / (far - near);
-            m.M43 = -2 * far * near / (far - near);
-            m.M34 = -1;
+            var m = new Matrix4x4
+            {
+                M11 = 2 * near / (right - left),
+                M22 = 2 * near / (top - bottom),
+                M31 = (right + left) / (right - left),
+                M32 = (top + bottom) / (top - bottom),
+                M33 = -(far + near) / (far - near),
+                M43 = -2 * far * near / (far - near),
+                M34 = -1
+            };
             return m;
         }
 
