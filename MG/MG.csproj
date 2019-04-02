@@ -50,6 +50,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="BezierCurve.cs" />
+    <Compile Include="BSplineCurve.cs" />
     <Compile Include="Camera.cs" />
     <Compile Include="DrawablePoint.cs" />
     <Compile Include="PointManipulator.cs" />

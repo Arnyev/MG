@@ -67,7 +67,7 @@ namespace MG
         private static Vector4 Point3C(Vector3 p1, Vector3 p2, Vector3 p3, float t)
             => new Vector4(p1 * (1 - t) * (1 - t) + p2 * 2 * t * (1 - t) + p3 * t * t, 1.0f);
 
-        private static Vector4 Point4C(Vector3 p1, Vector3 p2, Vector3 p3, Vector3 p4, float t)
+        public static Vector4 Point4C(Vector3 p1, Vector3 p2, Vector3 p3, Vector3 p4, float t)
             => new Vector4(
                 p1 * (1 - t) * (1 - t) * (1 - t) + p2 * 3 * t * (1 - t) * (1 - t) + p3 * 3 * (1 - t) * t * t +
                 p4 * t * t * t, 1.0f);

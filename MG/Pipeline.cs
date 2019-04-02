@@ -12,6 +12,7 @@ namespace MG
         private readonly float _fov;
         private readonly float _near;
         private readonly float _far;
+        private readonly float _aspectRatio;
         private readonly ObjectsController _objectsController;
         private readonly DirectBitmap _bitmap;
         private readonly Cursor3D _cursor;
@@ -26,6 +27,7 @@ namespace MG
             _far = (float)far;
             _objectsController = objectsController;
             _bitmap = bitmap;
+            _aspectRatio = (float)_bitmap.Width / _bitmap.Height;
             _cursor = cursor;
         }
 
@@ -41,19 +43,19 @@ namespace MG
 
             if (IsAnaglyphic)
             {
-                var left = StereoscopicMatrixL((float)_bitmap.Width / _bitmap.Height, _fov, _near, _far, eyesep,
+                var left = StereoscopicMatrixL(_aspectRatio, _fov, _near, _far, eyesep,
                     viewDist);
 
                 DrawSinglePass(left, new MyColor(255, 0, 0), true);
 
-                var right = StereoscopicMatrixR((float)_bitmap.Width / _bitmap.Height, _fov, _near, _far, eyesep,
+                var right = StereoscopicMatrixR(_aspectRatio, _fov, _near, _far, eyesep,
                     viewDist);
 
                 DrawSinglePass(right, new MyColor(0, 255, 255), true);
             }
             else
             {
-                var perspectiveMatrix = PerspectiveMatrix((float)_bitmap.Width / _bitmap.Height, _fov, _near, _far);
+                var perspectiveMatrix = PerspectiveMatrix(_aspectRatio, _fov, _near, _far);
                 DrawSinglePass(perspectiveMatrix, new MyColor(255, 255, 255), false);
                 var middleX = _bitmap.Width / 2;
                 var middleY = _bitmap.Height / 2;
@@ -63,40 +65,166 @@ namespace MG
             }
         }
 
+        private static Vector4 GetNormal(Vector3 v1, Vector4 v2)
+        {
+            var v23 = new Vector3(v2.X, v2.Y, v2.Z);
+            var nv2 = Vector3.Normalize(v23);
+            var cross = Vector3.Cross(v1, nv2);
+            return new Vector4(cross, 0);
+        }
+
+        private void UpdateEdgesIntersectionPoints(List<Vector4> points, List<Line> lines)
+        {
+            var tanFov = (float)Math.Tan(_fov / 2);
+            var startZ = -_near;
+            var endZ = -_far;
+            var xRatio = tanFov * _aspectRatio;
+            var yRatio = tanFov;
+
+            var pointFront = new Vector4(0, 0, -_far, 1);
+            var pointBack = new Vector4(0, 0, -_near, 1);
+            var pointRight = new Vector4(xRatio * -_far, 0, -_far, 1);
+            var pointLeft = new Vector4(-xRatio * -_far, 0, -_far, 1);
+            var pointUp = new Vector4(0, yRatio * -_far, -_far, 1);
+            var pointDown = new Vector4(0, -yRatio * -_far, -_far, 1);
+
+            var normalFront = new Vector4(0, 0, -1, 0);
+            var normalBack = new Vector4(0, 0, 1, 0);
+            var normalRight = GetNormal(new Vector3(0, 1, 0), pointRight);
+            var normalLeft = GetNormal(new Vector3(0, 1, 0), pointLeft);
+            var normalUp = GetNormal(new Vector3(1, 0, 0), pointUp);
+            var normalDown = GetNormal(new Vector3(1, 0, 0), pointDown);
+
+            Vector4[] normals = { normalFront, normalBack, normalRight, normalLeft, normalUp, normalDown };
+            Vector4[] planePoints = { pointFront, pointBack, pointRight, pointLeft, pointUp, pointDown };
+
+            var newLines = new List<Line>();
+            foreach (var line in lines)
+            {
+                List<Vector4> intersections = new List<Vector4>();
+                List<float> distances = new List<float>();
+
+                var inStart = points[line.Start];
+                var inEnd = points[line.End];
+
+                bool startInside = inStart.Z < startZ && inStart.Z > endZ &&
+                                   inStart.Y > inStart.Z * yRatio && inStart.Y < inStart.Z * -yRatio &&
+                                   inStart.X > inStart.Z * xRatio && inStart.X < inStart.Z * -xRatio;
+
+                bool endInside = inEnd.Z < startZ && inEnd.Z > endZ &&
+                                 inEnd.Y > inEnd.Z * yRatio && inEnd.Y < inEnd.Z * -yRatio &&
+                                 inEnd.X > inEnd.Z * xRatio && inEnd.X < inEnd.Z * -xRatio;
+
+                if (startInside & endInside)
+                {
+                    points[line.Start] = inStart;
+                    points[line.End] = inEnd;
+                    continue;
+                }
+
+                if (startInside)
+                {
+                    distances.Add(0);
+                    intersections.Add(inStart);
+                }
+
+                if (endInside)
+                {
+                    distances.Add(1);
+                    intersections.Add(inEnd);
+                }
+
+                var diff = inEnd - inStart;
+                for (int i = 0; i < 6; i++)
+                    if (CheckIntersection(planePoints[i], normals[i], inStart, diff, xRatio, yRatio, out Vector4 intersection, out float distance))
+                    {
+                        intersections.Add(intersection);
+                        distances.Add(distance);
+                    }
+
+                if (intersections.Count == 2)
+                {
+                    newLines.Add(new Line(points.Count, points.Count + 1));
+
+                    points.Add(intersections[0]);
+                    points.Add(intersections[1]);
+
+                }
+                else if (intersections.Count > 2)
+                {
+
+                }
+            }
+
+            lines.AddRange(newLines);
+        }
+
+        private bool CheckIntersection(Vector4 planePoint, Vector4 planeNormal, Vector4 lineStart, Vector4 lineDirection, float xRatio, float yRatio, out Vector4 intersection, out float distanceFromStart)
+        {
+            const float epsilon = 1e-4f;
+
+            distanceFromStart = Vector4.Dot(planePoint - lineStart, planeNormal) / Vector4.Dot(planeNormal, lineDirection);
+
+            if (distanceFromStart < -epsilon || distanceFromStart > 1 + epsilon)
+            {
+                intersection = new Vector4();
+                return false;
+            }
+
+            intersection = lineStart + distanceFromStart * lineDirection;
+            if (intersection.Z > -_near + epsilon || intersection.Z < -_far - epsilon)
+                return false;
+
+            //czy należy do frustrum
+            bool isOnNearOrFar = Math.Abs(intersection.Z - -_near) < epsilon || Math.Abs(intersection.Z - -_far) < epsilon;
+            bool isOutSide = intersection.X / intersection.Z > xRatio + epsilon || intersection.X / intersection.Z < -xRatio - epsilon ||
+                             intersection.Y / intersection.Z > yRatio + epsilon || intersection.Y / intersection.Z < -yRatio - epsilon;
+            return !isOnNearOrFar || !isOutSide;
+        }
+
         private void DrawSinglePass(Matrix4x4 perspectiveMatrix, MyColor color, bool shouldAppend)
         {
+
             var viewportMatrix = GetViewportMatrix(_bitmap.Width, _bitmap.Height);
             var viewMatrix = _camera.ViewMatrix;
             var matrixViewProj = viewMatrix * perspectiveMatrix;
 
             foreach (var ob in _objectsController.DrawableObjects)
             {
-                var curve = ob as BezierCurve;
+                var curve = ob as ICurve;
 
-                var mvp = ob.GetModelMatrix() * matrixViewProj;
+                var mv = ob.GetModelMatrix() * viewMatrix;
                 var tuple = ob.GetLines();
                 var pointsLines = tuple.Item2;
 
-                var newPoints = new Vector4[pointsLines.Length];
-                for (int i = 0; i < pointsLines.Length; i++)
+                var newPoints = pointsLines.Select(t => Vector4.Transform(t, mv)).ToList();
+
+                var lineList = tuple.Item1.ToList();
+
+                if (!(ob is Cursor3D))
+                    UpdateEdgesIntersectionPoints(newPoints, lineList);
+
+                for (int i = 0; i < newPoints.Count; i++)
                 {
-                    var transformed = Vector4.Transform(pointsLines[i], mvp);
-                    newPoints[i] = transformed / transformed.W;
+                    newPoints[i] = Vector4.Transform(newPoints[i], perspectiveMatrix);
+                    newPoints[i] = newPoints[i] / newPoints[i].W;
                 }
 
                 List<Tuple<Vector4, Vector4, bool>> linesToDraw = new List<Tuple<Vector4, Vector4, bool>>();
 
-                foreach (var line in tuple.Item1)
+                foreach (var line in lineList)
                 {
                     var p1 = newPoints[line.Start];
                     var p2 = newPoints[line.End];
-                    bool draw = !(!(p1.X > -1) || !(p1.X < 1) || !(p1.Y > -1) || !(p1.Y < 1) || !(p1.Z > -1) || !(p1.Z < 1) ||
-                                  !(p2.X > -1) || !(p2.X < 1) || !(p2.Y > -1) || !(p2.Y < 1) || !(p2.Z > -1) ||
-                                  !(p2.Z < 1));
+                    var minusOne = -1f - 1e-4f;
+                    var plusOne = 1f + 1e-4f;
+
+                    bool drawP1 = p1.X >= minusOne && p1.X <= plusOne && p1.Y >= minusOne && p1.Y <= plusOne && p1.Z >= minusOne && p1.Z <= 1;
+                    bool drawp2 = p2.X >= minusOne && p2.X <= plusOne && p2.Y >= minusOne && p2.Y <= plusOne && p2.Z >= minusOne && p2.Z <= 1;
 
                     p1 = Vector4.Transform(p1, viewportMatrix);
                     p2 = Vector4.Transform(p2, viewportMatrix);
-                    linesToDraw.Add(Tuple.Create(p1, p2, draw));
+                    linesToDraw.Add(Tuple.Create(p1, p2, drawP1 & drawp2));
                 }
 
                 if (curve == null || curve.DrawLines)
@@ -142,26 +270,26 @@ namespace MG
             if (pointData != null)
                 pointData.ScreenPosition = new Point(-100, -100);
 
-            if (!(p.X > -1) || !(p.X < 1) || !(p.Y > -1) || !(p.Y < 1) || !(p.Z > -1) || !(p.Z < 1))
-                return;
+            if (p.X > -1 && p.X < 1 && p.Y > -1 && p.Y < 1 && p.Z > -1 && p.Z < 1)
+            {
+                var screenPoint = Vector4.Transform(p, viewportMatrix);
+                if (screenPoint.X < 2 || screenPoint.X > _bitmap.Width - 2 || screenPoint.Y < 2 ||
+                    screenPoint.Y > _bitmap.Height - 2)
+                    return;
 
-            var screenPoint = Vector4.Transform(p, viewportMatrix);
-            if (screenPoint.X < 2 || screenPoint.X > _bitmap.Width - 2 || screenPoint.Y < 2 ||
-                screenPoint.Y > _bitmap.Height - 2)
-                return;
+                var x = (int)screenPoint.X;
+                var y = (int)screenPoint.Y;
+                _bitmap.SetPixel(x - 1, y, color);
+                _bitmap.SetPixel(x, y + 1, color);
+                _bitmap.SetPixel(x + 1, y, color);
+                _bitmap.SetPixel(x, y - 1, color);
+                _bitmap.SetPixel(x, y, color);
 
-            var x = (int)screenPoint.X;
-            var y = (int)screenPoint.Y;
-            _bitmap.SetPixel(x - 1, y, color);
-            _bitmap.SetPixel(x, y + 1, color);
-            _bitmap.SetPixel(x + 1, y, color);
-            _bitmap.SetPixel(x, y - 1, color);
-            _bitmap.SetPixel(x, y, color);
-
-            if (pointData != null)
-                pointData.ScreenPosition = new Point(x, y);
-            if (circle && g != null && pen != null)
-                g.DrawEllipse(pen, screenPoint.X - 5, screenPoint.Y - 5, 10, 10);
+                if (pointData != null)
+                    pointData.ScreenPosition = new Point(x, y);
+                if (circle && g != null && pen != null)
+                    g.DrawEllipse(pen, screenPoint.X - 5, screenPoint.Y - 5, 10, 10);
+            }
         }
 
         private static Matrix4x4 GetViewportMatrix(int width, int height)

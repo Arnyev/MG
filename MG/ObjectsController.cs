@@ -15,7 +15,10 @@ namespace MG
         private readonly ListBox _listBox2;
         private readonly Cursor3D _cursor;
         public IReadOnlyList<IDrawableObject> DrawableObjects => _listBox.Items.OfType<IDrawableObject>().ToList();
-        public IReadOnlyList<DrawablePoint> Points => _listBox.Items.OfType<DrawablePoint>().ToList();
+
+        public IReadOnlyList<DrawablePoint> Points => _listBox.Items.OfType<DrawablePoint>()
+            .Concat(_listBox.Items.OfType<BSplineCurve>().SelectMany(x => x.BernsteinPoints)).ToList();
+
         public RaycastingParameters RaycastingParameters { get; } = new RaycastingParameters();
 
         public ObjectsController(PropertyGrid propertyGrid, ListBox listBox, ListBox listBox2, FlowLayoutPanel panel, Cursor3D cursor)
@@ -33,7 +36,8 @@ namespace MG
             _listBox2.SelectedIndexChanged += _listBox2_SelectedIndexChanged;
             panel.Controls.Add(GetButton("Add torus", AddTorus));
             panel.Controls.Add(GetButton("Add point", AddPoint));
-            panel.Controls.Add(GetButton("Add curve", AddCurve));
+            panel.Controls.Add(GetButton("Add Bezier curve", AddBezierCurve));
+            panel.Controls.Add(GetButton("Add spline curve", AddSplineCurve));
             panel.Controls.Add(GetButton("Delete object", DeleteObject));
         }
 
@@ -62,13 +66,21 @@ namespace MG
             _listBox.Items.Add(point);
             _listBox.Refresh();
 
-            _listBox.Items.OfType<BezierCurve>().Where(x => x.Selected).ToList().ForEach(x => x.AddPoint(point));
+            _listBox.Items.OfType<ICurve>().Where(x => x.Selected).ToList().ForEach(x => x.AddPoint(point));
         }
 
-        private void AddCurve()
+        private void AddBezierCurve()
         {
             var selectedPoints = Points.Where(x => x.Selected).ToList();
             var curve = new BezierCurve();
+            selectedPoints.ForEach(x => curve.AddPoint(x));
+            _listBox.Items.Add(curve);
+        }
+
+        private void AddSplineCurve()
+        {
+            var selectedPoints = Points.Where(x => x.Selected).ToList();
+            var curve = new BSplineCurve();
             selectedPoints.ForEach(x => curve.AddPoint(x));
             _listBox.Items.Add(curve);
         }
@@ -101,7 +113,7 @@ namespace MG
             }
 
             if (selectedObject is DrawablePoint point)
-                _listBox.Items.OfType<BezierCurve>().Where(x => x.Selected).ToList().ForEach(x => x.AddPoint(point));
+                _listBox.Items.OfType<ICurve>().Where(x => x.Selected).ToList().ForEach(x => x.AddPoint(point));
 
             _isHandling = false;
         }
