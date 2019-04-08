@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
+using System.Windows.Forms;
 
 namespace MG
 {
@@ -14,6 +15,11 @@ namespace MG
 
         public void AddPoint(DrawablePoint point)
         {
+            if (IsBernstein)
+            {
+                MessageBox.Show("Can't add points in Bernstein mode.");
+                return;
+            }
             if (point != null && !_points.Contains(point))
                 _points.Add(point);
         }
@@ -134,23 +140,7 @@ namespace MG
         public List<Vector4> GetPoints(int count)
         {
             if (IsBernstein)
-            {
-                var list = new List<Vector4>();
-                var diff = 1.0f / (count - 1);
-
-                CorrectBernsteinPoints();
-                var coordinates = _bernsteinPoints.Select(x => new Vector3(x.X, x.Y, x.Z)).ToArray();
-
-                var currentPointIndex = 0;
-                while (coordinates.Length - currentPointIndex >= 4)
-                {
-                    list.AddRange(Enumerable.Range(0, count).Select(i =>
-                        BezierCurve.Point4C(coordinates[currentPointIndex], coordinates[currentPointIndex + 1], coordinates[currentPointIndex + 2], coordinates[currentPointIndex + 3], i * diff)));
-                    currentPointIndex += 3;
-                }
-
-                return list;
-            }
+                return ComputeInBernsteinBasis(count);
 
             List<Vector4> points = new List<Vector4>();
             var newPoints = _points.ToList();
@@ -173,6 +163,26 @@ namespace MG
             }
 
             return points;
+        }
+
+        private List<Vector4> ComputeInBernsteinBasis(int count)
+        {
+            var list = new List<Vector4>();
+            var diff = 1.0f / (count - 1);
+
+            CorrectBernsteinPoints();
+            var coordinates = _bernsteinPoints.Select(x => new Vector3(x.X, x.Y, x.Z)).ToArray();
+
+            var currentPointIndex = 0;
+            while (coordinates.Length - currentPointIndex >= 4)
+            {
+                list.AddRange(Enumerable.Range(0, count).Select(i =>
+                    BezierCurve.Point4C(coordinates[currentPointIndex], coordinates[currentPointIndex + 1],
+                        coordinates[currentPointIndex + 2], coordinates[currentPointIndex + 3], i * diff)));
+                currentPointIndex += 3;
+            }
+
+            return list;
         }
 
         private static float GetFourthPart(float val)
@@ -199,6 +209,11 @@ namespace MG
         public IReadOnlyList<object> List => _points;
         public void RemoveObject(object o)
         {
+            if (IsBernstein)
+            {
+                MessageBox.Show("Can't remove points in Bernstein mode.");
+                return;
+            }
             _points.Remove(o as DrawablePoint);
         }
 

@@ -53,6 +53,7 @@
     <Compile Include="BSplineCurve.cs" />
     <Compile Include="Camera.cs" />
     <Compile Include="DrawablePoint.cs" />
+    <Compile Include="InterpolatingBSpline.cs" />
     <Compile Include="PointManipulator.cs" />
     <Compile Include="Cursor3D.cs" />
     <Compile Include="DirectBitmap.cs" />

@@ -38,6 +38,7 @@ namespace MG
             panel.Controls.Add(GetButton("Add point", AddPoint));
             panel.Controls.Add(GetButton("Add Bezier curve", AddBezierCurve));
             panel.Controls.Add(GetButton("Add spline curve", AddSplineCurve));
+            panel.Controls.Add(GetButton("Add interpolating curve", AddBSplineInterpolateCurve));
             panel.Controls.Add(GetButton("Delete object", DeleteObject));
         }
 
@@ -81,6 +82,14 @@ namespace MG
         {
             var selectedPoints = Points.Where(x => x.Selected).ToList();
             var curve = new BSplineCurve();
+            selectedPoints.ForEach(x => curve.AddPoint(x));
+            _listBox.Items.Add(curve);
+        }
+
+        private void AddBSplineInterpolateCurve()
+        {
+            var selectedPoints = Points.Where(x => x.Selected).ToList();
+            var curve = new InterpolatingBSpline();
             selectedPoints.ForEach(x => curve.AddPoint(x));
             _listBox.Items.Add(curve);
         }
