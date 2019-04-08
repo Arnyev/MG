@@ -34,6 +34,7 @@ namespace MG
             _listBox.Items.Add(cursor);
             _listBox2.DisplayMember = "Name";
             _listBox2.SelectedIndexChanged += _listBox2_SelectedIndexChanged;
+            _listBox.Items.Add(new FrenetCurve());
             panel.Controls.Add(GetButton("Add torus", AddTorus));
             panel.Controls.Add(GetButton("Add point", AddPoint));
             panel.Controls.Add(GetButton("Add Bezier curve", AddBezierCurve));

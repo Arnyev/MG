@@ -107,15 +107,16 @@ namespace MG
             if (ChordParametrization)
             {
                 var distances = _points.Skip(1)
-                    .Zip(_points, (second, first) => Vector4.Distance(second.Point, first.Point)).ToArray();
-                var total = distances.Sum();
+                    .Zip(_points, (second, first) => Vector4.Distance(second.Point, first.Point))
+                    .ToArray();
                 var sum = 0.0f;
                 distances = distances.Select(x => sum += x).ToArray();
-                knots = Enumerable.Repeat(0.0f, 3).Concat(distances.Take(distances.Length-1).Select(x => x / total))
-                    .Concat(Enumerable.Repeat(1.0f,3)).ToArray();
+
+                knots = Enumerable.Repeat(0.0f, 3).Concat(distances.Take(distances.Length - 1).Select(x => x / sum))
+                    .Concat(Enumerable.Repeat(1.0f, 3)).ToArray();
             }
             else
-                knots= Enumerable.Repeat(0.0f, 2)
+                knots = Enumerable.Repeat(0.0f, 2)
                     .Concat(Enumerable.Range(0, _points.Count).Select(x => (float)x / (_points.Count - 1)))
                     .Concat(Enumerable.Repeat(1.0f, 2)).ToArray();
 
