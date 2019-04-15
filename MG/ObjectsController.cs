@@ -16,8 +16,11 @@ namespace MG
         private readonly Cursor3D _cursor;
         public IReadOnlyList<IDrawableObject> DrawableObjects => _listBox.Items.OfType<IDrawableObject>().ToList();
 
-        public IReadOnlyList<DrawablePoint> Points => _listBox.Items.OfType<DrawablePoint>()
-            .Concat(_listBox.Items.OfType<BSplineCurve>().SelectMany(x => x.BernsteinPoints)).ToList();
+        public IReadOnlyList<DrawablePoint> Points =>
+            _listBox.Items.OfType<DrawablePoint>()
+                .Concat(_listBox.Items.OfType<BSplineCurve>().SelectMany(x => x.BernsteinPoints))
+                .Concat(_listBox.Items.OfType<BasicSurface>().SelectMany(x => x.Points))
+                .ToList();
 
         public RaycastingParameters RaycastingParameters { get; } = new RaycastingParameters();
 
@@ -34,12 +37,13 @@ namespace MG
             _listBox.Items.Add(cursor);
             _listBox2.DisplayMember = "Name";
             _listBox2.SelectedIndexChanged += _listBox2_SelectedIndexChanged;
-            _listBox.Items.Add(new FrenetCurve());
+            //_listBox.Items.Add(new FrenetCurve());
             panel.Controls.Add(GetButton("Add torus", AddTorus));
             panel.Controls.Add(GetButton("Add point", AddPoint));
             panel.Controls.Add(GetButton("Add Bezier curve", AddBezierCurve));
             panel.Controls.Add(GetButton("Add spline curve", AddSplineCurve));
             panel.Controls.Add(GetButton("Add interpolating curve", AddBSplineInterpolateCurve));
+            panel.Controls.Add(GetButton("Add surface", AddSurface));
             panel.Controls.Add(GetButton("Delete object", DeleteObject));
         }
 
@@ -60,6 +64,18 @@ namespace MG
             var torus = new Torus();
             _listBox.Items.Add(torus);
             _listBox.Refresh();
+        }
+
+        private void AddSurface()
+        {
+            using (var form = new SurfaceForm())
+            {
+                if (form.ShowDialog() != DialogResult.OK)
+                    return;
+
+                _listBox.Items.Add(new BasicSurface(form.SurfaceProperties));
+                _listBox.Refresh();
+            }
         }
 
         private void AddPoint()
