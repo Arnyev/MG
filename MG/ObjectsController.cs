@@ -20,6 +20,7 @@ namespace MG
             _listBox.Items.OfType<DrawablePoint>()
                 .Concat(_listBox.Items.OfType<BSplineCurve>().SelectMany(x => x.BernsteinPoints))
                 .Concat(_listBox.Items.OfType<BasicSurface>().SelectMany(x => x.Points))
+                .Concat(_listBox.Items.OfType<BSplineSurface>().SelectMany(x => x.Points))
                 .ToList();
 
         public RaycastingParameters RaycastingParameters { get; } = new RaycastingParameters();
@@ -44,6 +45,7 @@ namespace MG
             panel.Controls.Add(GetButton("Add spline curve", AddSplineCurve));
             panel.Controls.Add(GetButton("Add interpolating curve", AddBSplineInterpolateCurve));
             panel.Controls.Add(GetButton("Add surface", AddSurface));
+            panel.Controls.Add(GetButton("Add BSpline surface", AddBsplineSurface));
             panel.Controls.Add(GetButton("Delete object", DeleteObject));
         }
 
@@ -74,6 +76,18 @@ namespace MG
                     return;
 
                 _listBox.Items.Add(new BasicSurface(form.SurfaceProperties));
+                _listBox.Refresh();
+            }
+        }
+
+        private void AddBsplineSurface()
+        {
+            using (var form = new SurfaceForm())
+            {
+                if (form.ShowDialog() != DialogResult.OK)
+                    return;
+
+                _listBox.Items.Add(new BSplineSurface(form.SurfaceProperties));
                 _listBox.Refresh();
             }
         }

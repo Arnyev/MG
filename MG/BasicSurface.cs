@@ -70,12 +70,10 @@ namespace MG
                     lines.Add(new Line(startIndex, startIndex + 1));
                 }
 
-                var indexU = i*(_countV * 3 + add);
-                if (_isTube)
-                    lines.Add(new Line(indexU, indexU + _countV * 3 - 1));
-                else
-                    lines.Add(new Line(indexU + _countV * 3 - 1, indexU + _countV * 3));
-
+                var indexU = i * (_countV * 3 + add);
+                lines.Add(_isTube
+                    ? new Line(indexU, indexU + _countV * 3 - 1)
+                    : new Line(indexU + _countV * 3 - 1, indexU + _countV * 3));
             }
 
             for (int i = 0; i < _countU * 3; i++)
@@ -85,11 +83,6 @@ namespace MG
                     lines.Add(new Line(startIndex, startIndex + _countV * 3 + add));
                 }
 
-            var xav = lines.Select((line, i) => Tuple.Create(line, i)).Where(x => x.Item1.End >= _points.Count || x.Item1.Start >= _points.Count).ToList();
-            if (xav.Count > 0)
-            {
-
-            }
             return Tuple.Create(lines.ToArray(), points);
         }
 
@@ -106,7 +99,6 @@ namespace MG
         public List<Vector4> GetPoints(int count)
         {
             var list = new List<Vector4>();
-            var p = _points.Select(x => x.Point).ToArray();
             count /= 8;
 
             for (int patchU = 0; patchU < _countU; patchU++)
@@ -122,7 +114,8 @@ namespace MG
                             var point = new Vector4();
                             for (int i = 0; i < 4; i++)
                                 for (int j = 0; j < 4; j++)
-                                    point += bezierPoints[i * 4 + j] * GetBernsteinValue(i, curveU) *
+                                    point += (i == 0 || i == 3 ? 1 : 3) * (j == 0 || j == 3 ? 1 : 3) *
+                                             bezierPoints[i * 4 + j] * GetBernsteinValue(i, curveU) *
                                              GetBernsteinValue(j, t);
                             list.Add(point);
                         }
@@ -135,7 +128,8 @@ namespace MG
                             var point = new Vector4();
                             for (int i = 0; i < 4; i++)
                                 for (int j = 0; j < 4; j++)
-                                    point += bezierPoints[i * 4 + j] * GetBernsteinValue(j, curveV) *
+                                    point += (i == 0 || i == 3 ? 1 : 3) * (j == 0 || j == 3 ? 1 : 3) *
+                                        bezierPoints[i * 4 + j] * GetBernsteinValue(j, curveV) *
                                              GetBernsteinValue(i, t);
                             list.Add(point);
                         }

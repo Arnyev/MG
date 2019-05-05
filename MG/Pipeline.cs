@@ -257,13 +257,14 @@ namespace MG
         {
             var g = Graphics.FromImage(_bitmap.Bitmap);
             var pen = Pens.Yellow;
+            var secondPen = Pens.Green;
             foreach (var point in _objectsController.Points)
-                DrawPoint(color, matrixViewProj, viewportMatrix, point.Point, g, pen, point, point.Selected);
+                DrawPoint(color, matrixViewProj, viewportMatrix, point.Point, g, pen, secondPen, point, point.Selected);
 
             g.Dispose();
         }
 
-        private void DrawPoint(MyColor color, Matrix4x4 matrixViewProj, Matrix4x4 viewportMatrix, Vector4 point, Graphics g = null, Pen pen = null, DrawablePoint pointData = null, bool circle = false)
+        private void DrawPoint(MyColor color, Matrix4x4 matrixViewProj, Matrix4x4 viewportMatrix, Vector4 point, Graphics g = null, Pen pen = null, Pen secondPen = null, DrawablePoint pointData = null, bool circle = false)
         {
             var transformed = Vector4.Transform(point, matrixViewProj);
             var p = transformed / transformed.W;
@@ -289,6 +290,8 @@ namespace MG
                     pointData.ScreenPosition = new Point(x, y);
                 if (circle && g != null && pen != null)
                     g.DrawEllipse(pen, screenPoint.X - 5, screenPoint.Y - 5, 10, 10);
+                if (!circle && g != null && secondPen != null)
+                    g.DrawEllipse(secondPen, screenPoint.X - 5, screenPoint.Y - 5, 10, 10);
             }
         }
 

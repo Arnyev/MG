@@ -185,23 +185,23 @@ namespace MG
             return list;
         }
 
-        private static float GetFourthPart(float val)
+        public static float GetFourthPart(float val)
         {
             val = 1 - val;
             return val * val * val / 6;
         }
 
-        private static float GetThirdPart(float val)
+        public static float GetThirdPart(float val)
         {
             return (4 - 6 * val * val + 3 * val * val * val) / 6;
         }
 
-        private static float GetSecondPart(float val)
+        public static float GetSecondPart(float val)
         {
             return (1 + 3 * val + 3 * val * val - 3 * val * val * val) / 6;
         }
 
-        private static float GetFirstPart(float val)
+        public static float GetFirstPart(float val)
         {
             return val * val * val / 6;
         }
