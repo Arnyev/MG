@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
+using System.Text;
 
 namespace MG
 {
@@ -10,6 +11,7 @@ namespace MG
         private static int _index;
 
         private readonly List<DrawablePoint> _points = new List<DrawablePoint>();
+        public List<DrawablePoint> Points => _points;
 
         public void AddPoint(DrawablePoint point)
         {
@@ -17,9 +19,26 @@ namespace MG
                 _points.Add(point);
         }
 
+        public override string ToString()
+        {
+            var sb = new StringBuilder();
+            sb.Append(Name);
+            _points.ForEach(p => sb.Append(" " + p.ToString()));
+            return sb.ToString();
+        }
+
+        public BezierCurve() { }
+
+        public BezierCurve(string s)
+        {
+            var l = s.Split(' ');
+            Name = l[0];
+            _points.AddRange(l.Skip(1).Select(str => new DrawablePoint(str)));
+        }
+
         public bool Selected { get; set; }
         public bool DrawLines { get; set; }
-        public string Name { get; set; } = "Bezier curve " + ++_index;
+        public string Name { get; set; } = "Bezier_curve_" + ++_index;
 
         public Matrix4x4 GetModelMatrix()
         {

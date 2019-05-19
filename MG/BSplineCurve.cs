@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
+using System.Text;
 using System.Windows.Forms;
 
 namespace MG
@@ -12,6 +13,7 @@ namespace MG
 
         private List<DrawablePoint> _points = new List<DrawablePoint>();
         private List<DrawablePoint> _bernsteinPoints = new List<DrawablePoint>();
+        public List<DrawablePoint> Points => _points;
 
         public void AddPoint(DrawablePoint point)
         {
@@ -24,9 +26,26 @@ namespace MG
                 _points.Add(point);
         }
 
+        public override string ToString()
+        {
+            var sb = new StringBuilder();
+            sb.Append(Name);
+            _points.ForEach(p => sb.Append(" " + p.ToString()));
+            return sb.ToString();
+        }
+
+        public BSplineCurve(string s)
+        {
+            var l = s.Split(' ');
+            Name = l[0];
+            _points.AddRange(l.Skip(1).Select(str => new DrawablePoint(str)));
+        }
+
+        public BSplineCurve()
+        { }
         public bool Selected { get; set; }
         public bool DrawLines { get; set; }
-        public string Name { get; set; } = "BSpline curve " + ++_index;
+        public string Name { get; set; } = "BSpline_curve_" + ++_index;
 
         private bool _isBernstein;
         public bool IsBernstein
@@ -185,15 +204,14 @@ namespace MG
             return list;
         }
 
-        public static float GetFourthPart(float val)
+        public static float GetFourthPart(float t)
         {
-            val = 1 - val;
-            return val * val * val / 6;
+            return (1 - t) * (1 - t) * (1 - t) / 6;
         }
 
-        public static float GetThirdPart(float val)
+        public static float GetThirdPart(float t)
         {
-            return (4 - 6 * val * val + 3 * val * val * val) / 6;
+            return (4 - 6 * t * t + 3 * t * t * t) / 6;
         }
 
         public static float GetSecondPart(float val)

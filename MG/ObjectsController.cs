@@ -1,8 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Numerics;
+using System.Text;
 using System.Windows.Forms;
 
 namespace MG
@@ -46,7 +49,131 @@ namespace MG
             panel.Controls.Add(GetButton("Add interpolating curve", AddBSplineInterpolateCurve));
             panel.Controls.Add(GetButton("Add surface", AddSurface));
             panel.Controls.Add(GetButton("Add BSpline surface", AddBsplineSurface));
+            panel.Controls.Add(GetButton("Serialize", Serialize));
+            panel.Controls.Add(GetButton("Deserialize", Deserialize));
             panel.Controls.Add(GetButton("Delete object", DeleteObject));
+        }
+
+        private void Deserialize()
+        {
+            string filename = string.Empty;
+
+            using (var ofd = new OpenFileDialog())
+            {
+                var res = ofd.ShowDialog();
+                if (res != DialogResult.OK)
+                    return;
+                else
+                    filename = ofd.FileName;
+            }
+
+            var f = _listBox.Items[0];
+            _listBox.Items.Clear();
+            _listBox.Items.Add(f);
+            var lines = File.ReadAllLines(filename);
+
+            for (int i = 0; i < lines.Length; i++)
+            {
+                string line = lines[i];
+
+                var spl = line.Split(' ');
+                var expected = int.Parse(spl[1].Trim());
+                i++;
+                var type = spl[0].Trim();
+                switch (type)
+                {
+                    case "curveC0":
+                        for (int j = 0; j < expected; j++, i++)
+                        {
+                            var curve = new BezierCurve(lines[i]);
+                            _listBox.Items.Add(curve);
+                            curve.Points.ForEach(p => _listBox.Items.Add(p));
+                        }
+                        break;
+                    case "curveC2":
+                        for (int j = 0; j < expected; j++, i++)
+                        {
+                            var curve = new BSplineCurve(lines[i]);
+                            _listBox.Items.Add(curve);
+                            curve.Points.ForEach(p => _listBox.Items.Add(p));
+                        }
+                        break;
+                    case "curveInt":
+                        for (int j = 0; j < expected; j++, i++)
+                        {
+                            var curve = new InterpolatingBSpline(lines[i]);
+                            _listBox.Items.Add(curve);
+                            curve.Points.ForEach(p => _listBox.Items.Add(p));
+                        }
+                        break;
+                    case "surfaceC0":
+                        for (int j = 0; j < expected; j++, i++)
+                            _listBox.Items.Add(new BasicSurface(lines[i], false));
+                        break;
+                    case "tubeC0":
+                        for (int j = 0; j < expected; j++, i++)
+                            _listBox.Items.Add(new BasicSurface(lines[i], true));
+                        break;
+                    case "surfaceC2":
+                        for (int j = 0; j < expected; j++, i++)
+                            _listBox.Items.Add(new BSplineSurface(lines[i], false));
+                        break;
+                    case "tubeC2":
+                        for (int j = 0; j < expected; j++, i++)
+                            _listBox.Items.Add(new BSplineSurface(lines[i], true));
+                        break;
+                    default:
+                        break;
+                }
+                i--;
+            }
+        }
+
+        private void Serialize()
+        {
+            CultureInfo.CurrentCulture = CultureInfo.InvariantCulture;
+            string filename = string.Empty;
+
+            using (var ofd = new SaveFileDialog())
+            {
+                var res = ofd.ShowDialog();
+                if (res != DialogResult.OK)
+                    return;
+                else
+                    filename = ofd.FileName;
+            }
+
+            List<string> s = new List<string>();
+
+            var bezierCurves = _listBox.Items.OfType<BezierCurve>().ToList();
+            s.Add($"curveC0 {bezierCurves.Count}");
+            bezierCurves.ForEach(c => s.Add(c.ToString()));
+
+            var bsplines = _listBox.Items.OfType<BSplineCurve>().ToList();
+            s.Add($"curveC2 {bsplines.Count}");
+            bsplines.ForEach(c => s.Add(c.ToString()));
+
+            var ints = _listBox.Items.OfType<InterpolatingBSpline>().ToList();
+            s.Add($"curveInt {ints.Count}");
+            ints.ForEach(c => s.Add(c.ToString()));
+
+            var surfs = _listBox.Items.OfType<BasicSurface>().Where(a => !a.IsTube).ToList();
+            s.Add($"surfaceC0 {surfs.Count}");
+            surfs.ForEach(c => s.Add(c.ToString()));
+
+            surfs = _listBox.Items.OfType<BasicSurface>().Where(a => a.IsTube).ToList();
+            s.Add($"tubeC0 {surfs.Count}");
+            surfs.ForEach(c => s.Add(c.ToString()));
+
+            var surfs2 = _listBox.Items.OfType<BSplineSurface>().Where(a => !a.IsTube).ToList();
+            s.Add($"surfaceC2 {surfs2.Count}");
+            surfs2.ForEach(c => s.Add(c.ToString()));
+
+            surfs2 = _listBox.Items.OfType<BSplineSurface>().Where(a => a.IsTube).ToList();
+            s.Add($"tubeC2 {surfs2.Count}");
+            surfs2.ForEach(c => s.Add(c.ToString()));
+
+            File.WriteAllLines(filename, s.ToArray());
         }
 
         private void _listBox2_SelectedIndexChanged(object sender, EventArgs e)
@@ -79,6 +206,8 @@ namespace MG
                 _listBox.Refresh();
             }
         }
+
+
 
         private void AddBsplineSurface()
         {
@@ -124,6 +253,8 @@ namespace MG
             selectedPoints.ForEach(x => curve.AddPoint(x));
             _listBox.Items.Add(curve);
         }
+
+
 
         private void DeleteObject()
         {

@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
+using System.Text;
 
 namespace MG
 {
@@ -22,6 +23,7 @@ namespace MG
         private readonly List<DrawablePoint> _points = new List<DrawablePoint>();
         public IReadOnlyList<DrawablePoint> Points => _points;
 
+        public bool IsTube => _isTube;
         public BasicSurface(SurfaceProperties properties)
         {
             _countU = properties.CountU;
@@ -47,8 +49,28 @@ namespace MG
 
                 for (int i = 0; i < _countU * 3 + 1; i++)
                     for (int j = 0; j < _countV * 3; j++)
-                        _points.Add(new DrawablePoint((float)Math.Cos(j * scaleV), (float)Math.Sin(j * scaleV), i * scaleU));
+                        _points.Add(new DrawablePoint((float)Math.Cos(j * scaleV) * properties.SizeV, (float)Math.Sin(j * scaleV) * properties.SizeV, i * scaleU));
             }
+        }
+
+        public override string ToString()
+        {
+            var sb = new StringBuilder();
+            sb.Append(Name);
+            sb.Append(" " + _countU);
+            sb.Append(" " + _countV);
+            _points.ForEach(p => sb.Append(" " + p.ToString()));
+            return sb.ToString();
+        }
+
+        public BasicSurface(string s, bool isTube)
+        {
+            var l = s.Split(' ');
+            Name = l[0];
+            _countU = int.Parse(l[1]);
+            _countV = int.Parse(l[2]);
+            _points = l.Skip(3).Select(x => new DrawablePoint(x)).ToList();
+            _isTube = isTube;
         }
 
         public Matrix4x4 GetModelMatrix()
@@ -191,5 +213,8 @@ namespace MG
         public void AddPoint(DrawablePoint point)
         {
         }
+
+        static int Nr = 1;
+        public string Name { get; set; }="Basic_surface" + Nr++;
     }
 }

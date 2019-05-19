@@ -18,16 +18,17 @@ namespace MG
 
         public int DivisionsU { get; set; } = 4;
         public int DivisionsV { get; set; } = 4;
+        public bool IsTube => _isTube;
 
         public BSplineSurface(SurfaceProperties properties)
         {
-            _countU = properties.CountU;
-            _countV = properties.CountV;
+            _countU = properties.CountU + 3;
+            _countV = properties.CountV + 3;
             _isTube = properties.IsTube;
 
             if (_countU < 4 || _countV < 4)
             {
-                MessageBox.Show("Cannot make a Bspline surface with less than 4 patches in any dimension.");
+                MessageBox.Show("Cannot make a Bspline surface with no patch.");
                 return;
             }
 
@@ -80,7 +81,7 @@ namespace MG
         public List<Vector4> GetPoints(int count)
         {
             var list = new List<Vector4>();
-            count /= 32;
+            count /= 8;
 
             for (int patchU = 3; patchU < _countU; patchU++)
             {
@@ -91,17 +92,17 @@ namespace MG
 
                     for (float curveU = 0; curveU <= 1.0; curveU += 1.0f / (DivisionsU - 1))
                     {
+                        var u1 = BSplineCurve.GetFirstPart(curveU);
+                        var u2 = BSplineCurve.GetSecondPart(curveU);
+                        var u3 = BSplineCurve.GetThirdPart(curveU);
+                        var u4 = BSplineCurve.GetFourthPart(curveU);
+
                         for (float t = 0; t < 1.0f; t += 1.0f / count)
                         {
-                            var u1 = BSplineCurve.GetFirstPart(curveU);
-                            var u2 = BSplineCurve.GetSecondPart(curveU);
-                            var u3 = BSplineCurve.GetThirdPart(curveU);
-                            var u4 = BSplineCurve.GetFourthPart(curveU);
-
-                            var t1 = BSplineCurve.GetFirstPart(t);
-                            var t2 = BSplineCurve.GetSecondPart(t);
-                            var t3 = BSplineCurve.GetThirdPart(t);
-                            var t4 = BSplineCurve.GetFourthPart(t);
+                            var t1 = t * t * t / 6;
+                            var t2 = (1 + 3 * t + 3 * t * t - 3 * t * t * t) / 6;
+                            var t3 = (4 - 6 * t * t + 3 * t * t * t) / 6;
+                            var t4 = (1 - t) * (1 - t) * (1 - t) / 6;
                             var point =
                                 u1 * t1 * p[0] + u1 * t2 * p[1] + u1 * t3 * p[2] + u1 * t4 * p[3] +
                                 u2 * t1 * p[4] + u2 * t2 * p[5] + u2 * t3 * p[6] + u2 * t4 * p[7] +
@@ -114,17 +115,17 @@ namespace MG
 
                     for (float curveV = 0; curveV <= 1.0; curveV += 1.0f / (DivisionsV - 1))
                     {
+                        var u1 = BSplineCurve.GetFirstPart(curveV);
+                        var u2 = BSplineCurve.GetSecondPart(curveV);
+                        var u3 = BSplineCurve.GetThirdPart(curveV);
+                        var u4 = BSplineCurve.GetFourthPart(curveV);
+
                         for (float t = 0; t < 1.0f; t += 1.0f / count)
                         {
-                            var u1 = BSplineCurve.GetFirstPart(curveV);
-                            var u2 = BSplineCurve.GetSecondPart(curveV);
-                            var u3 = BSplineCurve.GetThirdPart(curveV);
-                            var u4 = BSplineCurve.GetFourthPart(curveV);
-
-                            var t1 = BSplineCurve.GetFirstPart(t);
-                            var t2 = BSplineCurve.GetSecondPart(t);
-                            var t3 = BSplineCurve.GetThirdPart(t);
-                            var t4 = BSplineCurve.GetFourthPart(t);
+                            var t1 = t * t * t / 6;
+                            var t2 = (1 + 3 * t + 3 * t * t - 3 * t * t * t) / 6;
+                            var t3 = (4 - 6 * t * t + 3 * t * t * t) / 6;
+                            var t4 = (1 - t) * (1 - t) * (1 - t) / 6;
                             var point =
                                 t1 * u1 * p[0] + t1 * u2 * p[1] + t1 * u3 * p[2] + t1 * u4 * p[3] +
                                 t2 * u1 * p[4] + t2 * u2 * p[5] + t2 * u3 * p[6] + t2 * u4 * p[7] +
@@ -138,6 +139,26 @@ namespace MG
             }
 
             return list;
+        }
+
+        public override string ToString()
+        {
+            var sb = new StringBuilder();
+            sb.Append(Name);
+            sb.Append(" " + (_countU - 3));
+            sb.Append(" " + (_countV - 3));
+            _points.ForEach(p => sb.Append(" " + p.ToString()));
+            return sb.ToString();
+        }
+
+        public BSplineSurface(string s, bool isTube)
+        {
+            var l = s.Split(' ');
+            Name = l[0];
+            _countU = int.Parse(l[1]) + 3;
+            _countV = int.Parse(l[2]) + 3;
+            _points = l.Skip(3).Select(x => new DrawablePoint(x)).ToList();
+            _isTube = isTube;
         }
 
         private Vector4[] GetDeBoorPoints(int patchU, int patchV)
@@ -163,5 +184,15 @@ namespace MG
         public void AddPoint(DrawablePoint point)
         {
         }
+
+        static int Nr = 1;
+        public string Name { get; set; } = "Bspline_surface" + Nr++;
+
+        public bool AllPointsSelected
+        {
+            get => _points.All(x => x.Selected);
+            set => _points.ForEach(x => x.Selected = value);
+        }
+
     }
 }
