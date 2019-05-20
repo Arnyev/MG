@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Windows.Forms;
 
@@ -29,7 +30,7 @@ namespace MG
 
             _camera = new Camera(pictureBox1, this);
             _cursor = new Cursor3D(_camera, pictureBox1, (float)Near, (float)Far);
-            _controller = new ObjectsController(propertyGrid1, listBox1,listBox2, flowLayoutPanel1, _cursor);
+            _controller = new ObjectsController(propertyGrid1, listBox1, listBox2, flowLayoutPanel1, _cursor);
             _pipeline = new Pipeline(_camera, Fov, Near, Far, _controller, _bitmap, _cursor);
 
             _manipulator = new PointManipulator(_controller, (float)Fov, pictureBox1, _camera);

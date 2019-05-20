@@ -66,7 +66,10 @@ namespace MG
                 .ToList();
 
             if (distances.Count > 0)
-                points[distances[0].Item2].Selected = !points[distances[0].Item2].Selected;
+            {
+                var point = points[distances[0].Item2];
+                point.Selected = !point.Selected;
+            }
         }
     }
 }

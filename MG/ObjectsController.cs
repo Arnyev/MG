@@ -49,9 +49,101 @@ namespace MG
             panel.Controls.Add(GetButton("Add interpolating curve", AddBSplineInterpolateCurve));
             panel.Controls.Add(GetButton("Add surface", AddSurface));
             panel.Controls.Add(GetButton("Add BSpline surface", AddBsplineSurface));
+            panel.Controls.Add(GetButton("Match points", MatchPoints));
+            panel.Controls.Add(GetButton("Insert patch", InsertPatch));
             panel.Controls.Add(GetButton("Serialize", Serialize));
             panel.Controls.Add(GetButton("Deserialize", Deserialize));
             panel.Controls.Add(GetButton("Delete object", DeleteObject));
+
+            var surf1 = new BasicSurface(new SurfaceProperties());
+            var surf2 = new BasicSurface(new SurfaceProperties(), new Vector4(2, 0, 2, 0));
+            var surf3 = new BasicSurface(new SurfaceProperties(), new Vector4(0, 0, 4, 0));
+            var surf4 = new BasicSurface(new SurfaceProperties(), new Vector4(-2, 0, 2, 0));
+
+            Vector4 ValueFuncU0(float v) => surf1.GetPoint(v, 1);
+            Vector4 ValueFuncU1(float v) => surf3.GetPoint(v, 0);
+            Vector4 ValueFuncV0(float u) => surf4.GetPoint(1, u);
+            Vector4 ValueFuncV1(float u) => surf2.GetPoint(0, u);
+
+            Vector4 DerivativeFuncU0(float v) => surf1.Dv(v, 1);
+            Vector4 DerivativeFuncU1(float v) => surf3.Dv(v, 0);
+            Vector4 DerivativeFuncV0(float u) => surf4.Du(1, u);
+            Vector4 DerivativeFuncV1(float u) => surf2.Du(0, u);
+
+            var f = 1.0f;
+            Vector4 Duv00() => f * surf1.DuDv(0, 1);
+            Vector4 Dvu00() => f * surf4.DuDv(0, 0);
+
+            Vector4 Duv01() => f * surf1.DuDv(1, 1);
+            Vector4 Dvu01() => f * surf2.DuDv(1, 0);
+
+            Vector4 Duv10() => f * surf3.DuDv(0, 0);
+            Vector4 Dvu10() => f * surf4.DuDv(0, 1);
+
+            Vector4 Duv11() => f * surf3.DuDv(1, 0);
+            Vector4 Dvu11() => f * surf2.DuDv(1, 1);
+
+            _listBox.Items.Add(surf1);
+            _listBox.Items.Add(surf2);
+            _listBox.Items.Add(surf3);
+            _listBox.Items.Add(surf4);
+
+            var greg = new GregoryPatch(ValueFuncU0, ValueFuncU1, ValueFuncV0, ValueFuncV1, DerivativeFuncU0,
+                DerivativeFuncU1, DerivativeFuncV0, DerivativeFuncV1, Duv00, Dvu00, Duv01, Dvu01, Duv10, Dvu10, Duv11,
+                Dvu11);
+
+            _listBox.Items.Add(greg);
+        }
+
+        private void InsertPatch()
+        {
+            var surfaces = _listBox.Items.OfType<BasicSurface>().Where(x => x.Selected).ToList();
+            if (surfaces.Count != 3)
+                return;
+
+            var merged1 = surfaces[0].Points.Where(x => x.IsMerged).ToList();
+            var merged2 = surfaces[1].Points.Where(x => x.IsMerged).ToList();
+            var merged3 = surfaces[2].Points.Where(x => x.IsMerged).ToList();
+
+            merged1 = merged1.Where(x => merged2.Contains(x) || merged3.Contains(x)).ToList();
+            merged2 = merged2.Where(x => merged1.Contains(x) || merged3.Contains(x)).ToList();
+            merged3 = merged3.Where(x => merged2.Contains(x) || merged1.Contains(x)).ToList();
+
+            if (merged1.Count != 2 || merged2.Count != 2 || merged3.Count != 2)
+                return;
+
+            if (!surfaces[0].AreLine(merged1[0], merged1[1]))
+                return;
+
+            if (!surfaces[1].AreLine(merged2[0], merged2[1]))
+                return;
+
+            if (!surfaces[2].AreLine(merged3[0], merged3[1]))
+                return;
+
+            int k = 7;
+        }
+
+        private void MatchPoints()
+        {
+            var surfaces = _listBox.Items.OfType<BasicSurface>().Where(x => x.Points.Any(y => y.Selected && y.IsCorner)).ToList();
+
+            if (surfaces.Count != 2)
+                return;
+
+            var ps1 = surfaces[0].Points.Where(x => x.IsCorner && x.Selected && !x.IsMerged).ToList();
+            var ps2 = surfaces[1].Points.Where(x => x.IsCorner && x.Selected && !x.IsMerged).ToList();
+
+            if (ps1.Count != 1 || ps2.Count != 1 || ps1[0] == ps2[0])
+                return;
+
+            var p1 = ps1[0];
+            var p2 = ps2[0];
+
+            var newPosition = (p1.Point + p2.Point) / 2;
+            p1.Point = newPosition;
+            surfaces[1].ReplacePoint(p2, p1);
+            p1.IsMerged = true;
         }
 
         private void Deserialize()

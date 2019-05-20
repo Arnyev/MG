@@ -15,7 +15,7 @@ namespace MG
         public float SizeV { get; set; } = 2;
     }
 
-    class BasicSurface : IDrawableObject, ICurve
+    public class BasicSurface : IDrawableObject, ICurve
     {
         private readonly int _countU;
         private readonly int _countV;
@@ -24,7 +24,7 @@ namespace MG
         public IReadOnlyList<DrawablePoint> Points => _points;
 
         public bool IsTube => _isTube;
-        public BasicSurface(SurfaceProperties properties)
+        public BasicSurface(SurfaceProperties properties, Vector4 translation = new Vector4())
         {
             _countU = properties.CountU;
             _countV = properties.CountV;
@@ -41,6 +41,14 @@ namespace MG
                 for (int i = 0; i < _countU * 3 + 1; i++)
                     for (int j = 0; j < _countV * 3 + 1; j++)
                         _points.Add(new DrawablePoint(i * scaleU, 0, j * scaleV));
+
+                if (_countV == 1 && _countV == 1)
+                {
+                    _points[0].IsCorner = true;
+                    _points[3].IsCorner = true;
+                    _points[12].IsCorner = true;
+                    _points[15].IsCorner = true;
+                }
             }
             else
             {
@@ -51,6 +59,122 @@ namespace MG
                     for (int j = 0; j < _countV * 3; j++)
                         _points.Add(new DrawablePoint((float)Math.Cos(j * scaleV) * properties.SizeV, (float)Math.Sin(j * scaleV) * properties.SizeV, i * scaleU));
             }
+
+            _points.ForEach(x => x.Point = x.Point + translation);
+        }
+
+        public Vector4 Dv(float u, float v, int depth = 0)
+        {
+            var lcPoints = _points.Select(x => x.Point).ToArray();
+            var point = new Vector4();
+            for (int i = 0; i < 4; i++)
+                for (int j = 0; j < 3; j++)
+                {
+                    var diff = lcPoints[i * 4 + j + 1] - lcPoints[i * 4 + j];
+                    var b1 = GetBernsteinValue(i, u);
+                    var b2 = GetBernsteinValue2(j, v);
+                    point += diff * b1 * b2;
+                }
+
+            return 3 * point;
+        }
+
+        public Vector4 Du(float u, float v, int depth = 0)
+        {
+            var lcPoints = _points.Select(x => x.Point).ToArray();
+            var point = new Vector4();
+            for (int i = 0; i < 3; i++)
+                for (int j = 0; j < 4; j++)
+                {
+                    var diff = lcPoints[i * 4 + j + 4] - lcPoints[i * 4 + j];
+                    var b1 = GetBernsteinValue2(i, u);
+                    var b2 = GetBernsteinValue(j, v);
+                    point += diff * b1 * b2;
+                }
+
+            return 3 * point;
+        }
+
+        public Vector4 DuDv(float u, float v)
+        {
+            var lcPoints = _points.Select(x => x.Point).ToArray();
+            var point = new Vector4();
+            for (int i = 0; i < 3; i++)
+                for (int j = 0; j < 3; j++)
+                {
+                    var diff = (lcPoints[i * 4 + j + 5] - lcPoints[i * 4 + j + 1]) - (lcPoints[i * 4 + j + 4] - lcPoints[i * 4 + j]);
+                    var b1 = GetBernsteinValue2(i, u);
+                    var b2 = GetBernsteinValue2(j, v);
+                    point += diff * b1 * b2;
+                }
+
+            var derivative = 9 * point;
+
+            return derivative;
+        }
+
+        public Vector4 GetPoint(float u, float v)
+        {
+            var bezierPoints = _points.Select(x => x.Point).ToArray();
+            var point = new Vector4();
+            for (int i = 0; i < 4; i++)
+                for (int j = 0; j < 4; j++)
+                    point += bezierPoints[i * 4 + j] * GetBernsteinValue(i, u) *
+                             GetBernsteinValue(j, v);
+
+            return point;
+        }
+
+        private float GetBernsteinValue2(int index, float t)
+        {
+            switch (index)
+            {
+                case 0:
+                    return (1.0f - t) * (1.0f - t);
+                case 1:
+                    return 2 * t * (1.0f - t);
+                case 2:
+                    return t * t;
+            }
+
+            return 0;
+        }
+        public bool AreLine(DrawablePoint p1, DrawablePoint p2)
+        {
+            if (!p1.IsCorner || !p2.IsCorner)
+                return false;
+
+            var i1 = _points.IndexOf(p1);
+            var i2 = _points.IndexOf(p2);
+
+            if (i1 < 0 || i2 < 0)
+                return false;
+
+            if (i1 == i2)
+                return false;
+
+            var sm = i1 < i2 ? i1 : i2;
+            var bi = i1 > i2 ? i1 : i2;
+
+            if (sm == 0 && bi == 15)
+                return false;
+
+            if (sm == 3 && bi == 12)
+                return false;
+
+            return true;
+        }
+
+        public void ReplacePoint(DrawablePoint old, DrawablePoint newPoint)
+        {
+            var index = _points.IndexOf(old);
+            if (index < 0 || index >= _points.Count)
+                return;
+
+            if (!old.IsCorner)
+                return;
+
+            _points[index] = newPoint;
         }
 
         public override string ToString()
@@ -136,8 +260,7 @@ namespace MG
                             var point = new Vector4();
                             for (int i = 0; i < 4; i++)
                                 for (int j = 0; j < 4; j++)
-                                    point += (i == 0 || i == 3 ? 1 : 3) * (j == 0 || j == 3 ? 1 : 3) *
-                                             bezierPoints[i * 4 + j] * GetBernsteinValue(i, curveU) *
+                                    point += bezierPoints[i * 4 + j] * GetBernsteinValue(i, curveU) *
                                              GetBernsteinValue(j, t);
                             list.Add(point);
                         }
@@ -150,8 +273,7 @@ namespace MG
                             var point = new Vector4();
                             for (int i = 0; i < 4; i++)
                                 for (int j = 0; j < 4; j++)
-                                    point += (i == 0 || i == 3 ? 1 : 3) * (j == 0 || j == 3 ? 1 : 3) *
-                                        bezierPoints[i * 4 + j] * GetBernsteinValue(j, curveV) *
+                                    point += bezierPoints[i * 4 + j] * GetBernsteinValue(j, curveV) *
                                              GetBernsteinValue(i, t);
                             list.Add(point);
                         }
@@ -199,9 +321,9 @@ namespace MG
                 case 0:
                     return (1.0f - t) * (1.0f - t) * (1.0f - t);
                 case 1:
-                    return t * (1.0f - t) * (1.0f - t);
+                    return 3 * t * (1.0f - t) * (1.0f - t);
                 case 2:
-                    return t * t * (1.0f - t);
+                    return 3 * t * t * (1.0f - t);
                 case 3:
                     return t * t * t;
             }
@@ -215,6 +337,6 @@ namespace MG
         }
 
         static int Nr = 1;
-        public string Name { get; set; }="Basic_surface" + Nr++;
+        public string Name { get; set; } = "Basic_surface" + Nr++;
     }
 }

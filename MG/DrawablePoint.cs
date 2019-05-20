@@ -64,6 +64,10 @@ namespace MG
         }
 
         public Point ScreenPosition { get; set; }
+        public bool IsCorner { get; set; }
+
+        public bool IsMerged { get; set; }
+
 
         public override string ToString()
         {

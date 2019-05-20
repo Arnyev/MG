@@ -258,13 +258,21 @@ namespace MG
             var g = Graphics.FromImage(_bitmap.Bitmap);
             var pen = Pens.Yellow;
             var secondPen = Pens.Green;
+            var thirdPen = Pens.BlueViolet;
             foreach (var point in _objectsController.Points)
-                DrawPoint(color, matrixViewProj, viewportMatrix, point.Point, g, pen, secondPen, point, point.Selected);
+                DrawPoint(color, matrixViewProj, viewportMatrix, point.Point, g, pen, secondPen, thirdPen, point, point.Selected);
+
+            //var p2 = _objectsController.DrawableObjects.OfType<BasicSurface>()
+            //    .SelectMany(x => new[] { x.GetPoint(0.0f, 0.5f), x.GetPoint(0.0f, 0.5f) + x.Du(0.0f, 0.5f) })
+            //    .Select(x => new DrawablePoint(x.X, x.Y, x.Z)).ToList();
+
+            //p2.ForEach(x => DrawPoint(color, matrixViewProj, viewportMatrix, x.Point, g, pen, secondPen, thirdPen, x, true));
+
 
             g.Dispose();
         }
 
-        private void DrawPoint(MyColor color, Matrix4x4 matrixViewProj, Matrix4x4 viewportMatrix, Vector4 point, Graphics g = null, Pen pen = null, Pen secondPen = null, DrawablePoint pointData = null, bool circle = false)
+        private void DrawPoint(MyColor color, Matrix4x4 matrixViewProj, Matrix4x4 viewportMatrix, Vector4 point, Graphics g = null, Pen pen = null, Pen secondPen = null, Pen thirdPen = null, DrawablePoint pointData = null, bool circle = false)
         {
             var transformed = Vector4.Transform(point, matrixViewProj);
             var p = transformed / transformed.W;
@@ -286,8 +294,13 @@ namespace MG
                 _bitmap.SetPixel(x, y - 1, color);
                 _bitmap.SetPixel(x, y, color);
 
-                if (pointData != null)
+                if (pointData != null && thirdPen != null)
+                {
                     pointData.ScreenPosition = new Point(x, y);
+                    if (pointData.IsCorner)
+                        g.DrawEllipse(thirdPen, screenPoint.X - 6, screenPoint.Y - 6, 12, 12);
+                }
+
                 if (circle && g != null && pen != null)
                     g.DrawEllipse(pen, screenPoint.X - 5, screenPoint.Y - 5, 10, 10);
                 if (!circle && g != null && secondPen != null)

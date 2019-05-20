@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace MG
 {
-    struct Line
+    public struct Line
     {
         public readonly int Start;
         public readonly int End;
