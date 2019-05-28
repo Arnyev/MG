@@ -302,6 +302,32 @@ namespace MG
             return f => new Vector4();
         }
 
+        public Func<Vector4> DerivativeMiddle(UVDirection direction)
+        {
+            switch (direction)
+            {
+                case UVDirection.U0V01:
+                    return () => Dv(0, 0.5f);
+                case UVDirection.U0V10:
+                    return () => Dv(0, 0.5f);
+                case UVDirection.U1V01:
+                    return () => Dv(1, 0.5f);
+                case UVDirection.U1V10:
+                    return () => Dv(1, 0.5f);
+                case UVDirection.V0U01:
+                    return () => Du(0.5f, 0);
+                case UVDirection.V0U10:
+                    return () => Du(0.5f, 0);
+                case UVDirection.V1U01:
+                    return () => Du(0.5f, 1);
+                case UVDirection.V1U10:
+                    return () => Du(0.5f, 1);
+
+            }
+
+            return () => new Vector4();
+        }
+
         public Tuple<Func<Vector4>, Func<Vector4>> GetSecondDerivativeFuncs
             (UVDirection direction, bool firstHalf)
         {

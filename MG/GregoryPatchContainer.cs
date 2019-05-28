@@ -16,6 +16,7 @@ namespace MG
         public Func<Vector4> DuDvA;
         public Func<Vector4> DuDvB;
         public Func<Vector4> DuDvC;
+        public Func<Vector4> DerivativeMiddle;
     }
 
     public class SimpleBezier
@@ -30,6 +31,10 @@ namespace MG
             return P1 * (1 - t) * (1 - t) * (1 - t) + P2 * 3 * t * (1 - t) * (1 - t) +
                    P3 * 3 * (1 - t) * t * t + P4 * t * t * t;
         }
+
+        public Vector4 DerivativeAt0() => (P2 - P1) * 3;
+
+        public Vector4 DerivativeAt1() => (P3 - P4) * 3;
     }
 
     public class GregoryPatchContainer
@@ -58,7 +63,7 @@ namespace MG
             get
             {
                 UpdateBeziers();
-                return new List<IDrawableObject> { patch1,patch2 };
+                return new List<IDrawableObject> { patch1 };
             }
         }
 
@@ -73,7 +78,6 @@ namespace MG
             get => patch1.DivisionsV;
             set { Patches.Cast<GregoryPatch>().ToList().ForEach(x => x.DivisionsV = value); }
         }
-
 
         public GregoryPatchContainer(BasicSurface s1, BasicSurface s2, BasicSurface s3, UVDirection d1, UVDirection d2, UVDirection d3)
         {
@@ -130,11 +134,44 @@ namespace MG
                 duv11: Zeron,
                 dvu11: Zeron
             );
+
+            patch3 = new GregoryPatch(
+                valueFuncU0: SB3.GetPoint,
+                valueFuncU1: EdgeFuncs2.ValueB,
+                valueFuncV0: EdgeFuncs3.ValueB,
+                valueFuncV1: SB2.GetPoint,
+                derivativeFuncU0: Zerof,
+                derivativeFuncU1: EdgeFuncs2.DerivativeB,
+                derivativeFuncV0: EdgeFuncs3.DerivativeB,
+                derivativeFuncV1: Zerof,
+                duv00: EdgeFuncs3.DuDvB,
+                dvu00: EdgeFuncs3.DuDvB,
+                duv01: Zeron,
+                dvu01: Zeron,
+                duv10: EdgeFuncs2.DuDvC,
+                dvu10: EdgeFuncs3.DuDvC,
+                duv11: EdgeFuncs2.DuDvB,
+                dvu11: EdgeFuncs2.DuDvB
+            );
+        }
+
+        private Vector4 P1DU1(float t)
+        {
+            var p1 = EdgeFuncs3.DerivativeMiddle();
+            var p2 = SB1.DerivativeAt0();
+            return (1 - t) * p1 + t * p2;
+        }
+
+        private Vector4 P1DV1(float t)
+        {
+            var p1 = Vector4.Normalize(EdgeFuncs1.DerivativeMiddle()/2);
+            var p2 = Vector4.Normalize(-SB3.DerivativeAt1());
+            return (1 - t) * p1 + t * p2;
         }
 
         public void UpdateBeziers()
         {
-            var px1= EdgeFuncs1.ValueA(0);
+            var px1 = EdgeFuncs1.ValueA(0);
             var px2 = EdgeFuncs2.ValueA(0);
             var px3 = EdgeFuncs3.ValueA(0);
             var px4 = EdgeFuncs1.ValueB(1);
@@ -152,9 +189,9 @@ namespace MG
             var f2 = IsAt0(_d2) ? -1 : 1;
             var f3 = IsAt0(_d3) ? -1 : 1;
 
-            var p21 = p31 + f1*EdgeFuncs1.DerivativeA(1) / 6;
-            var p22 = p32 + f2*EdgeFuncs2.DerivativeA(1) / 6;
-            var p23 = p33 + f3*EdgeFuncs3.DerivativeA(1) / 6;
+            var p21 = p31 + f1 * EdgeFuncs1.DerivativeA(1) / 6;
+            var p22 = p32 + f2 * EdgeFuncs2.DerivativeA(1) / 6;
+            var p23 = p33 + f3 * EdgeFuncs3.DerivativeA(1) / 6;
 
             var q1 = (3 * p21 - p31) / 2;
             var q2 = (3 * p22 - p32) / 2;
@@ -200,7 +237,8 @@ namespace MG
                 DerivativeB = d1b,
                 DuDvA = tdu1a.Item1,
                 DuDvB = tdu1a.Item2,
-                DuDvC = tdu1b.Item2
+                DuDvC = tdu1b.Item2,
+                DerivativeMiddle = _s1.DerivativeMiddle(_d1)
             };
 
             var d2o = OppositeDirection(_d2);
@@ -220,7 +258,8 @@ namespace MG
                 DerivativeB = d2b,
                 DuDvA = tdu2a.Item1,
                 DuDvB = tdu2a.Item2,
-                DuDvC = tdu2b.Item2
+                DuDvC = tdu2b.Item2,
+                DerivativeMiddle = _s2.DerivativeMiddle(_d2)
             };
 
             var v3a = _s3.GetValueFunc(_d3, true);
@@ -239,7 +278,8 @@ namespace MG
                 DerivativeB = d3b,
                 DuDvA = tdu3a.Item1,
                 DuDvB = tdu3a.Item2,
-                DuDvC = tdu3b.Item2
+                DuDvC = tdu3b.Item2,
+                DerivativeMiddle = _s3.DerivativeMiddle(_d3),
             };
         }
 

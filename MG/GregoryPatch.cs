@@ -163,7 +163,7 @@ namespace MG
 
         public List<Vector4> GetPoints(int count)
         {
-            //count /= 8;
+            count /= 8;
             var mX = ComputeMatrixX();
             var mY = ComputeMatrixY();
             var mZ = ComputeMatrixZ();

@@ -86,6 +86,9 @@ namespace MG
             Vector4 Duv11() => f * surf3.DuDv(1, 0);
             Vector4 Dvu11() => f * surf2.DuDv(0, 1);
 
+            surf1.Selected = true;
+            surf2.Selected = true;
+            surf3.Selected = true;
             _listBox.Items.Add(surf1);
             _listBox.Items.Add(surf2);
             _listBox.Items.Add(surf3);
