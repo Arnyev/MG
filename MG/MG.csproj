@@ -57,6 +57,7 @@
     <Compile Include="DrawablePoint.cs" />
     <Compile Include="FrenetCurve.cs" />
     <Compile Include="GregoryPatch.cs" />
+    <Compile Include="GregoryPatchContainer.cs" />
     <Compile Include="InterpolatingBSpline.cs" />
     <Compile Include="PointManipulator.cs" />
     <Compile Include="Cursor3D.cs" />

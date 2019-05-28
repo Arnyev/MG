@@ -17,7 +17,10 @@ namespace MG
         private readonly ListBox _listBox;
         private readonly ListBox _listBox2;
         private readonly Cursor3D _cursor;
-        public IReadOnlyList<IDrawableObject> DrawableObjects => _listBox.Items.OfType<IDrawableObject>().ToList();
+        public IReadOnlyList<IDrawableObject> DrawableObjects =>
+            _listBox.Items.OfType<IDrawableObject>()
+            .Concat(_listBox.Items.OfType<GregoryPatchContainer>().SelectMany(x => x.Patches))
+                .ToList();
 
         public IReadOnlyList<DrawablePoint> Points =>
             _listBox.Items.OfType<DrawablePoint>()
@@ -72,27 +75,27 @@ namespace MG
 
             var f = 1.0f;
             Vector4 Duv00() => f * surf1.DuDv(0, 1);
-            Vector4 Dvu00() => f * surf4.DuDv(0, 0);
+            Vector4 Dvu00() => f * surf4.DuDv(1, 0);
 
             Vector4 Duv01() => f * surf1.DuDv(1, 1);
-            Vector4 Dvu01() => f * surf2.DuDv(1, 0);
+            Vector4 Dvu01() => f * surf2.DuDv(0, 0);
 
             Vector4 Duv10() => f * surf3.DuDv(0, 0);
-            Vector4 Dvu10() => f * surf4.DuDv(0, 1);
+            Vector4 Dvu10() => f * surf4.DuDv(1, 1);
 
             Vector4 Duv11() => f * surf3.DuDv(1, 0);
-            Vector4 Dvu11() => f * surf2.DuDv(1, 1);
+            Vector4 Dvu11() => f * surf2.DuDv(0, 1);
 
             _listBox.Items.Add(surf1);
             _listBox.Items.Add(surf2);
             _listBox.Items.Add(surf3);
-            _listBox.Items.Add(surf4);
+            //_listBox.Items.Add(surf4);
 
             var greg = new GregoryPatch(ValueFuncU0, ValueFuncU1, ValueFuncV0, ValueFuncV1, DerivativeFuncU0,
                 DerivativeFuncU1, DerivativeFuncV0, DerivativeFuncV1, Duv00, Dvu00, Duv01, Dvu01, Duv10, Dvu10, Duv11,
                 Dvu11);
 
-            _listBox.Items.Add(greg);
+            //_listBox.Items.Add(greg);
         }
 
         private void InsertPatch()
@@ -115,13 +118,44 @@ namespace MG
             if (!surfaces[0].AreLine(merged1[0], merged1[1]))
                 return;
 
+            if (merged3.Contains(merged1[1]))
+            {
+                var tmps = surfaces[2];
+                surfaces[2] = surfaces[1];
+                surfaces[1] = tmps;
+
+                var tmpm = merged3;
+                merged3 = merged2;
+                merged2 = tmpm;
+            }
+
+            if (merged2.IndexOf(merged1[1]) == 1)
+            {
+                var tmpp = merged2[0];
+                merged2[0] = merged2[1];
+                merged2[1] = tmpp;
+            }
+
+            if (merged3.IndexOf(merged2[1]) == 0)
+            {
+                var tmpp = merged3[0];
+                merged3[0] = merged3[1];
+                merged3[1] = tmpp;
+            }
+
             if (!surfaces[1].AreLine(merged2[0], merged2[1]))
                 return;
 
             if (!surfaces[2].AreLine(merged3[0], merged3[1]))
                 return;
 
-            int k = 7;
+            var d1 = surfaces[0].GetDirection(merged1[0], merged1[1]);
+            var d2 = surfaces[1].GetDirection(merged2[0], merged2[1]);
+            var d3 = surfaces[2].GetDirection(merged3[0], merged3[1]);
+
+            var container = new GregoryPatchContainer(surfaces[0], surfaces[1], surfaces[2], d1, d2, d3);
+            _listBox.Items.Add(container);
+            _listBox.Refresh();
         }
 
         private void MatchPoints()
@@ -391,7 +425,7 @@ namespace MG
         }
     }
 
-    interface IDrawableObject
+    public interface IDrawableObject
     {
         Matrix4x4 GetModelMatrix();
         Tuple<Line[], Vector4[]> GetLines();

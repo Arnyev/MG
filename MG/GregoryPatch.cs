@@ -5,7 +5,7 @@ using System.Numerics;
 
 namespace MG
 {
-    class GregoryPatch : IDrawableObject, ICurve
+    public class GregoryPatch : IDrawableObject, ICurve
     {
         private readonly Func<float, Vector4> _valueFuncU0;
         private readonly Func<float, Vector4> _valueFuncU1;
@@ -163,7 +163,7 @@ namespace MG
 
         public List<Vector4> GetPoints(int count)
         {
-            count /= 8;
+            //count /= 8;
             var mX = ComputeMatrixX();
             var mY = ComputeMatrixY();
             var mZ = ComputeMatrixZ();

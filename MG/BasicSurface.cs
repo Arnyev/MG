@@ -6,6 +6,17 @@ using System.Text;
 
 namespace MG
 {
+    public enum UVDirection
+    {
+        U0V01,
+        U0V10,
+        U1V01,
+        U1V10,
+        V0U01,
+        V0U10,
+        V1U01,
+        V1U10,
+    }
     public class SurfaceProperties
     {
         public bool IsTube { get; set; }
@@ -165,6 +176,181 @@ namespace MG
             return true;
         }
 
+        public UVDirection GetDirection(DrawablePoint p1, DrawablePoint p2)
+        {
+            var i1 = _points.IndexOf(p1);
+            var i2 = _points.IndexOf(p2);
+
+            switch (i1)
+            {
+                case 0 when i2 == 3:
+                    return UVDirection.U0V01;
+                case 3 when i2 == 0:
+                    return UVDirection.U0V10;
+                case 0 when i2 == 12:
+                    return UVDirection.V0U01;
+                case 12 when i2 == 0:
+                    return UVDirection.V0U10;
+                case 3 when i2 == 15:
+                    return UVDirection.V1U01;
+                case 15 when i2 == 3:
+                    return UVDirection.V1U10;
+                case 12 when i2 == 15:
+                    return UVDirection.U1V01;
+                case 15 when i2 == 12:
+                    return UVDirection.U1V10;
+                default:
+                    return UVDirection.U0V01;
+            }
+        }
+
+        public Func<float, Vector4> GetValueFunc(UVDirection direction, bool firstHalf)
+        {
+            switch (direction)
+            {
+                case UVDirection.U0V01:
+                    if (firstHalf)
+                        return f => GetPoint(0, f / 2);
+                    else
+                        return f => GetPoint(0, f / 2 + 0.5f);
+                case UVDirection.U0V10:
+                    if (firstHalf)
+                        return f => GetPoint(0, 1 - f / 2);
+                    else
+                        return f => GetPoint(0, 0.5f - f / 2);
+                case UVDirection.U1V01:
+                    if (firstHalf)
+                        return f => GetPoint(1, f / 2);
+                    else
+                        return f => GetPoint(1, f / 2 + 0.5f);
+                case UVDirection.U1V10:
+                    if (firstHalf)
+                        return f => GetPoint(1, 1 - f / 2);
+                    else
+                        return f => GetPoint(1, 0.5f - f / 2);
+                case UVDirection.V0U01:
+                    if (firstHalf)
+                        return f => GetPoint(f / 2, 0);
+                    else
+                        return f => GetPoint(0.5f + f / 2, 0);
+                case UVDirection.V0U10:
+                    if (firstHalf)
+                        return f => GetPoint(1 - f / 2, 0);
+                    else
+                        return f => GetPoint(0.5f - f / 2, 0);
+                case UVDirection.V1U01:
+                    if (firstHalf)
+                        return f => GetPoint(f / 2, 1);
+                    else
+                        return f => GetPoint(0.5f + f / 2, 1);
+                case UVDirection.V1U10:
+                    if (firstHalf)
+                        return f => GetPoint(1 - f / 2, 1);
+                    else
+                        return f => GetPoint(0.5f - f / 2, 1);
+            }
+
+            return f => new Vector4();
+        }
+
+        public Func<float, Vector4> GetDerivativeFunc(UVDirection direction, bool firstHalf)
+        {
+            switch (direction)
+            {
+                case UVDirection.U0V01:
+                    if (firstHalf)
+                        return f => Du(0, f / 2);
+                    else
+                        return f => Du(0, f / 2 + 0.5f);
+                case UVDirection.U0V10:
+                    if (firstHalf)
+                        return f => Du(0, 1 - f / 2);
+                    else
+                        return f => Du(0, 0.5f - f / 2);
+                case UVDirection.U1V01:
+                    if (firstHalf)
+                        return f => Du(1, f / 2);
+                    else
+                        return f => Du(1, f / 2 + 0.5f);
+                case UVDirection.U1V10:
+                    if (firstHalf)
+                        return f => Du(1, 1 - f / 2);
+                    else
+                        return f => Du(1, 0.5f - f / 2);
+                case UVDirection.V0U01:
+                    if (firstHalf)
+                        return f => Dv(f / 2, 0);
+                    else
+                        return f => Dv(0.5f + f / 2, 0);
+                case UVDirection.V0U10:
+                    if (firstHalf)
+                        return f => Dv(1 - f / 2, 0);
+                    else
+                        return f => Dv(0.5f - f / 2, 0);
+                case UVDirection.V1U01:
+                    if (firstHalf)
+                        return f => Dv(f / 2, 1);
+                    else
+                        return f => Dv(0.5f + f / 2, 1);
+                case UVDirection.V1U10:
+                    if (firstHalf)
+                        return f => Dv(1 - f / 2, 1);
+                    else
+                        return f => Dv(0.5f - f / 2, 1);
+            }
+
+            return f => new Vector4();
+        }
+
+        public Tuple<Func<Vector4>, Func<Vector4>> GetSecondDerivativeFuncs
+            (UVDirection direction, bool firstHalf)
+        {
+            switch (direction)
+            {
+                case UVDirection.U0V01:
+                    if (firstHalf)
+                        return new Tuple<Func<Vector4>, Func<Vector4>>(() => DuDv(0, 0), () => DuDv(0, 0.5f));
+                    else
+                        return new Tuple<Func<Vector4>, Func<Vector4>>(() => DuDv(0, 0.5f), () => DuDv(0, 1));
+                case UVDirection.U0V10:
+                    if (firstHalf)
+                        return new Tuple<Func<Vector4>, Func<Vector4>>(() => DuDv(0, 1), () => DuDv(0, 0.5f));
+                    else
+                        return new Tuple<Func<Vector4>, Func<Vector4>>(() => DuDv(0, 0.5f), () => DuDv(0, 1));
+                case UVDirection.U1V01:
+                    if (firstHalf)
+                        return new Tuple<Func<Vector4>, Func<Vector4>>(() => DuDv(1, 0), () => DuDv(0, 0.5f));
+                    else
+                        return new Tuple<Func<Vector4>, Func<Vector4>>(() => DuDv(1, 0.5f), () => DuDv(1, 1));
+                case UVDirection.U1V10:
+                    if (firstHalf)
+                        return new Tuple<Func<Vector4>, Func<Vector4>>(() => DuDv(1, 1), () => DuDv(1, 0.5f));
+                    else
+                        return new Tuple<Func<Vector4>, Func<Vector4>>(() => DuDv(1, 0.5f), () => DuDv(1, 0));
+                case UVDirection.V0U01:
+                    if (firstHalf)
+                        return new Tuple<Func<Vector4>, Func<Vector4>>(() => DuDv(0, 0), () => DuDv(0.5f, 0));
+                    else
+                        return new Tuple<Func<Vector4>, Func<Vector4>>(() => DuDv(0.5f, 0), () => DuDv(1, 0));
+                case UVDirection.V0U10:
+                    if (firstHalf)
+                        return new Tuple<Func<Vector4>, Func<Vector4>>(() => DuDv(1, 0), () => DuDv(0.5f, 0));
+                    else
+                        return new Tuple<Func<Vector4>, Func<Vector4>>(() => DuDv(0.5f, 0), () => DuDv(0, 0));
+                case UVDirection.V1U01:
+                    if (firstHalf)
+                        return new Tuple<Func<Vector4>, Func<Vector4>>(() => DuDv(0, 1), () => DuDv(0.5f, 1));
+                    else
+                        return new Tuple<Func<Vector4>, Func<Vector4>>(() => DuDv(0.5f, 1), () => DuDv(1, 1));
+                case UVDirection.V1U10:
+                    if (firstHalf)
+                        return new Tuple<Func<Vector4>, Func<Vector4>>(() => DuDv(1, 1), () => DuDv(0.5f, 1));
+                    else
+                        return new Tuple<Func<Vector4>, Func<Vector4>>(() => DuDv(0.5f, 1), () => DuDv(0, 1));
+            }
+
+            return new Tuple<Func<Vector4>, Func<Vector4>>(() => new Vector4(), () => new Vector4());
+        }
         public void ReplacePoint(DrawablePoint old, DrawablePoint newPoint)
         {
             var index = _points.IndexOf(old);
