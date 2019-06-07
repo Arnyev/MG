@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Numerics;
 
 namespace MG
@@ -6,8 +8,8 @@ namespace MG
     class Torus : IDrawableObject
     {
         private static int _torusNumber = 1;
-        public double TubeRadius { get; set; } = 2;
-        public double TorusRadius { get; set; } = 10;
+        public float TubeRadius { get; set; } = 2;
+        public float TorusRadius { get; set; } = 10;
         public float PositionX { get; set; }
         public float PositionY { get; set; }
         public float PositionZ { get; set; }
@@ -114,6 +116,174 @@ namespace MG
                     ret[i, j] = GetPoint(i * diffa, j * diffb);
 
             return ret;
+        }
+
+        public List<Tuple<Vector3, Vector3>> GetBoundingBox()
+        {
+            var pointsMine = new List<Vector3>
+            {
+                new Vector3(-TorusRadius - TubeRadius, -TorusRadius - TubeRadius, -TubeRadius), // - - -
+                new Vector3(-TorusRadius - TubeRadius, -TorusRadius - TubeRadius, TubeRadius),  // - - +
+                new Vector3(-TorusRadius - TubeRadius, TorusRadius + TubeRadius, -TubeRadius),  // - + -
+                new Vector3(-TorusRadius - TubeRadius, TorusRadius + TubeRadius, TubeRadius),   // - + +
+                new Vector3(TorusRadius + TubeRadius, -TorusRadius - TubeRadius, -TubeRadius),  // + - -
+                new Vector3(TorusRadius + TubeRadius, -TorusRadius - TubeRadius, TubeRadius),   // + = +
+                new Vector3(TorusRadius + TubeRadius, TorusRadius + TubeRadius, -TubeRadius),   // + + -
+                new Vector3(TorusRadius + TubeRadius, TorusRadius + TubeRadius, TubeRadius),    // + + +
+            };
+
+            var myMatrix = GetModelMatrix();
+            pointsMine = pointsMine.Select(x => Vector3.Transform(x, myMatrix)).ToList();
+
+            var result = new List<Tuple<Vector3, Vector3>>
+            {
+                Tuple.Create(pointsMine[0], pointsMine[1]),
+                Tuple.Create(pointsMine[0], pointsMine[2]),
+                Tuple.Create(pointsMine[0], pointsMine[4]),
+                Tuple.Create(pointsMine[1], pointsMine[3]),
+                Tuple.Create(pointsMine[1], pointsMine[5]),
+                Tuple.Create(pointsMine[2], pointsMine[3]),
+                Tuple.Create(pointsMine[2], pointsMine[6]),
+                Tuple.Create(pointsMine[3], pointsMine[7]),
+                Tuple.Create(pointsMine[4], pointsMine[5]),
+                Tuple.Create(pointsMine[4], pointsMine[6]),
+                Tuple.Create(pointsMine[5], pointsMine[7]),
+                Tuple.Create(pointsMine[6], pointsMine[7]),
+            };
+
+            return result;
+        }
+
+        public List<Tuple<Vector3, Vector3, Vector3>> GetBoxFaces()
+        {
+            var pointsMine = new List<Vector3>
+            {
+                new Vector3(-TorusRadius - TubeRadius, -TorusRadius - TubeRadius, -TubeRadius), // - - -
+                new Vector3(-TorusRadius - TubeRadius, -TorusRadius - TubeRadius, TubeRadius),  // - - +
+                new Vector3(-TorusRadius - TubeRadius, TorusRadius + TubeRadius, -TubeRadius),  // - + -
+                new Vector3(-TorusRadius - TubeRadius, TorusRadius + TubeRadius, TubeRadius),   // - + +
+                new Vector3(TorusRadius + TubeRadius, -TorusRadius - TubeRadius, -TubeRadius),  // + - -
+                new Vector3(TorusRadius + TubeRadius, -TorusRadius - TubeRadius, TubeRadius),   // + - +
+                new Vector3(TorusRadius + TubeRadius, TorusRadius + TubeRadius, -TubeRadius),   // + + -
+                new Vector3(TorusRadius + TubeRadius, TorusRadius + TubeRadius, TubeRadius),    // + + +
+            };
+
+            var myMatrix = GetModelMatrix();
+            pointsMine = pointsMine.Select(x => Vector3.Transform(x, myMatrix)).ToList();
+
+            var result = new List<Tuple<Vector3, Vector3, Vector3>>
+            {
+                Tuple.Create(pointsMine[0], pointsMine[1], pointsMine[3]),  // -x
+                Tuple.Create(pointsMine[0], pointsMine[1], pointsMine[5]),  // -y
+                Tuple.Create(pointsMine[0], pointsMine[4], pointsMine[6]),  // -z
+                Tuple.Create(pointsMine[1], pointsMine[3], pointsMine[7]),  // +z
+                Tuple.Create(pointsMine[2], pointsMine[3], pointsMine[7]),  // + y
+                Tuple.Create(pointsMine[4], pointsMine[6], pointsMine[7]),  // + x 
+            };
+
+            return result;
+        }
+
+        public List<Vector4> Intersection(Torus other)
+        {
+            var myEdges = GetBoundingBox();
+            var otherEdges = other.GetBoundingBox();
+
+            var faces = GetBoxFaces();
+            var otherFaces = other.GetBoxFaces();
+
+            var intersecting = CheckEdgeSquareIntersections(myEdges, otherFaces);
+            if (!intersecting)
+                intersecting = CheckEdgeSquareIntersections(otherEdges, faces);
+
+            return null;
+        }
+
+        public static bool CheckEdgeTriangleIntersections(List<Tuple<Vector3, Vector3>> edges, List<Tuple<Vector3, Vector3, Vector3>> triangles)
+        {
+            bool intersecting = false;
+            foreach (var edge in edges)
+            {
+                foreach (var face in triangles)
+                {
+                    var p1 = face.Item1;
+                    var p2 = face.Item2;
+                    var p3 = face.Item3;
+                    var normal = Vector3.Cross(p1 - p2, p3 - p2);
+                    var l = edge.Item2 - edge.Item1;
+                    var l0 = edge.Item1;
+
+                    var d = Vector3.Dot(p1 - l0, normal) / Vector3.Dot(l, normal);
+                    if (float.IsNaN(d) || d < 0 || d > 1)
+                        continue;
+
+                    var newPoint = d * l + l0;
+
+                    var v0 = p2 - p1;
+                    var v1 = p3 - p1;
+                    var v2 = newPoint - p1;
+                    float d00 = Vector3.Dot(v0, v0);
+                    float d01 = Vector3.Dot(v0, v1);
+                    float d11 = Vector3.Dot(v1, v1);
+                    float d20 = Vector3.Dot(v2, v0);
+                    float d21 = Vector3.Dot(v2, v1);
+                    float denom = d00 * d11 - d01 * d01;
+                    var v = (d11 * d20 - d01 * d21) / denom;
+                    var w = (d00 * d21 - d01 * d20) / denom;
+                    var u = 1.0f - v - w;
+
+                    if (v >= 0 && v <= 1 && u >= 0 && u <= 1 && w >= 0 && w <= 1)
+                    {
+                        intersecting = true;
+                        break;
+                    }
+                }
+
+                if (intersecting)
+                    break;
+            }
+
+            return intersecting;
+        }
+
+        public static bool CheckEdgeSquareIntersections(List<Tuple<Vector3, Vector3>> edges, List<Tuple<Vector3, Vector3, Vector3>> squares)
+        {
+            bool intersecting = false;
+            foreach (var edge in edges)
+            {
+                foreach (var face in squares)
+                {
+                    var p1 = face.Item1;
+                    var p2 = face.Item2;
+                    var p3 = face.Item3;
+                    var normal = Vector3.Cross(p1 - p2, p3 - p2);
+                    var l = edge.Item2 - edge.Item1;
+                    var l0 = edge.Item1;
+
+                    var d = Vector3.Dot(p1 - l0, normal) / Vector3.Dot(l, normal);
+                    if (float.IsNaN(d) || d < 0 || d > 1)
+                        continue;
+
+                    var newPoint = d * l + l0;
+                    var dir1 = p1 - p2;
+                    var dir2 = p3 - p2;
+
+                    var v1 = newPoint - p2;
+                    var d1 = Vector3.Dot(v1, dir1) / dir1.LengthSquared();
+                    var d2 = Vector3.Dot(v1, dir2) / dir2.LengthSquared();
+
+                    if (d1 >= 0 && d1 <= 1 && d2 >= 0 && d2 <= 1)
+                    {
+                        intersecting = true;
+                        break;
+                    }
+                }
+
+                if (intersecting)
+                    break;
+            }
+
+            return intersecting;
         }
 
         private Vector3 GetPoint(double alpha, double beta)

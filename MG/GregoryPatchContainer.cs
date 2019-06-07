@@ -63,7 +63,7 @@ namespace MG
             get
             {
                 UpdateBeziers();
-                return new List<IDrawableObject> { patch1 };
+                return new List<IDrawableObject> { patch1 ,patch2, patch3};
             }
         }
 
