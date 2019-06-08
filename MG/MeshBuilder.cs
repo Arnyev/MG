@@ -112,9 +112,11 @@ namespace MG
             new[] { f.HalfEdge, HalfEdges[f.HalfEdge].Next, HalfEdges[HalfEdges[f.HalfEdge].Next].Next };
 
 
-        public Vector3[][] GetMesh(List<Vector3> pointCloud)
+        public List<TriangleIndices> GetMesh()
         {
-            var indices = new List<int>();
+            var indices = new List<TriangleIndices>();
+            indices.Capacity = Faces.Count - _disabledFaces.Count;
+
             bool[] faceProcessed = new bool[Faces.Count];
             var faceStack = new Stack<int>();
 
@@ -150,15 +152,24 @@ namespace MG
 
                 var vertices = GetVertexIndicesOfFace(Faces[top]);
 
-                indices.Add(vertices[0]);
-                indices.Add(vertices[1]);
-                indices.Add(vertices[2]);
+                indices.Add(new TriangleIndices(vertices[0], vertices[1], vertices[2]));
             }
 
-            var triangles = new List<Vector3[]>();
-            for (int i = 0; i < indices.Count / 3; i++)
-                triangles.Add(new[] { pointCloud[indices[3 * i]], pointCloud[indices[3 * i + 1]], pointCloud[indices[3 * i + 2]] });
+            return indices;
+        }
 
+        public static Triangle[] CreateTriangles(List<Vector3> pointCloud, List<TriangleIndices> indices)
+        {
+            var triangles = new List<Triangle>();
+            for (int i = 0; i < indices.Count; i++)
+            {
+                var triangleIndices = indices[i];
+                triangles.Add(new Triangle(
+                    pointCloud[triangleIndices.A],
+                    pointCloud[triangleIndices.B],
+                    pointCloud[triangleIndices.C]));
+            }
+            
             return triangles.ToArray();
         }
     }

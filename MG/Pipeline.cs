@@ -184,10 +184,11 @@ namespace MG
 
         private void DrawSinglePass(Matrix4x4 perspectiveMatrix, MyColor color, bool shouldAppend)
         {
-
             var viewportMatrix = GetViewportMatrix(_bitmap.Width, _bitmap.Height);
             var viewMatrix = _camera.ViewMatrix;
             var matrixViewProj = viewMatrix * perspectiveMatrix;
+
+            DrawIntersections(color, perspectiveMatrix, viewMatrix, viewportMatrix);
 
             foreach (var ob in _objectsController.DrawableObjects)
             {
@@ -196,36 +197,9 @@ namespace MG
                 var mv = ob.GetModelMatrix() * viewMatrix;
                 var tuple = ob.GetLines();
                 var pointsLines = tuple.Item2;
-
-                var newPoints = pointsLines.Select(t => Vector4.Transform(t, mv)).ToList();
-
                 var lineList = tuple.Item1.ToList();
 
-                if (!(ob is Cursor3D))
-                    UpdateEdgesIntersectionPoints(newPoints, lineList);
-
-                for (int i = 0; i < newPoints.Count; i++)
-                {
-                    newPoints[i] = Vector4.Transform(newPoints[i], perspectiveMatrix);
-                    newPoints[i] = newPoints[i] / newPoints[i].W;
-                }
-
-                List<Tuple<Vector4, Vector4, bool>> linesToDraw = new List<Tuple<Vector4, Vector4, bool>>();
-
-                foreach (var line in lineList)
-                {
-                    var p1 = newPoints[line.Start];
-                    var p2 = newPoints[line.End];
-                    var minusOne = -1f - 1e-4f;
-                    var plusOne = 1f + 1e-4f;
-
-                    bool drawP1 = p1.X >= minusOne && p1.X <= plusOne && p1.Y >= minusOne && p1.Y <= plusOne && p1.Z >= minusOne && p1.Z <= 1;
-                    bool drawp2 = p2.X >= minusOne && p2.X <= plusOne && p2.Y >= minusOne && p2.Y <= plusOne && p2.Z >= minusOne && p2.Z <= 1;
-
-                    p1 = Vector4.Transform(p1, viewportMatrix);
-                    p2 = Vector4.Transform(p2, viewportMatrix);
-                    linesToDraw.Add(Tuple.Create(p1, p2, drawP1 & drawp2));
-                }
+                var linesToDraw = GetLinesToDraw(perspectiveMatrix, pointsLines, mv, ob, lineList, viewportMatrix);
 
                 if (curve == null || curve.DrawLines)
                     linesToDraw.Where(x => x.Item3).ToList().
@@ -247,10 +221,112 @@ namespace MG
 
                 var pointsToDraw = curve.GetPoints(count);
 
-                pointsToDraw.ForEach(x => DrawPoint(color, matrixViewProj, viewportMatrix, x));
+                DrawSimplePoints(color, pointsToDraw, matrixViewProj, viewportMatrix, _bitmap);
             }
 
             DrawPoints(color, matrixViewProj, viewportMatrix);
+        }
+
+        private List<Tuple<Vector4, Vector4, bool>> GetLinesToDraw(Matrix4x4 perspectiveMatrix, Vector4[] pointsLines,
+            Matrix4x4 mv, IDrawableObject ob,
+            List<Line> lineList, Matrix4x4 viewportMatrix)
+        {
+            var newPoints = pointsLines.Select(t => Vector4.Transform(t, mv)).ToList();
+
+            if (!(ob is Cursor3D))
+                UpdateEdgesIntersectionPoints(newPoints, lineList);
+
+            for (int i = 0; i < newPoints.Count; i++)
+            {
+                newPoints[i] = Vector4.Transform(newPoints[i], perspectiveMatrix);
+                newPoints[i] = newPoints[i] / newPoints[i].W;
+            }
+
+            List<Tuple<Vector4, Vector4, bool>> linesToDraw = new List<Tuple<Vector4, Vector4, bool>>();
+
+            foreach (var line in lineList)
+            {
+                var p1 = newPoints[line.Start];
+                var p2 = newPoints[line.End];
+                var minusOne = -1f - 1e-4f;
+                var plusOne = 1f + 1e-4f;
+
+                bool drawP1 = p1.X >= minusOne && p1.X <= plusOne && p1.Y >= minusOne && p1.Y <= plusOne && p1.Z >= minusOne &&
+                              p1.Z <= 1;
+                bool drawp2 = p2.X >= minusOne && p2.X <= plusOne && p2.Y >= minusOne && p2.Y <= plusOne && p2.Z >= minusOne &&
+                              p2.Z <= 1;
+
+                p1 = Vector4.Transform(p1, viewportMatrix);
+                p2 = Vector4.Transform(p2, viewportMatrix);
+                linesToDraw.Add(Tuple.Create(p1, p2, drawP1 & drawp2));
+            }
+
+            return linesToDraw;
+        }
+
+        private void DrawIntersections(MyColor color, Matrix4x4 perspectiveMatrix, Matrix4x4 viewMatrix, Matrix4x4 viewportMatrix)
+        {
+            var matrixViewProj = viewMatrix * perspectiveMatrix;
+
+            var ta = _objectsController.DrawableObjects.OfType<Torus>().ToList();
+            var t1 = ta[0];
+            var t2 = ta[1];
+
+            int intersectionCount = 200;
+
+            var vertices = new List<Vector3>();
+            var indices = new List<TriangleIndices>();
+
+            t1.GetTriangles(intersectionCount, intersectionCount, indices, vertices);
+
+            var verticesB = new List<Vector3>();
+            var indicesB = new List<TriangleIndices>();
+            t2.GetTriangles(intersectionCount, intersectionCount, indicesB, verticesB);
+
+            var simpleMesh = new SimpleMesh(indices, vertices);
+            var meshB = new SimpleMesh(indicesB, verticesB);
+            var kb2 = new KDTree(simpleMesh, meshB, true);
+
+            var g = Graphics.FromImage(_bitmap.Bitmap);
+            var pen = Pens.Red;
+            var secondPen = Pens.Green;
+            var thirdPen = Pens.BlueViolet;
+            var intersectionPoints = kb2.GetIntersectionPoints();
+
+            foreach (var point in intersectionPoints)
+                DrawPoint(color, matrixViewProj, viewportMatrix, point, g, pen, secondPen, thirdPen, null, true);
+        }
+
+
+        private static void DrawSimplePoints(MyColor color, List<Vector4> pointsToDraw, Matrix4x4 matrixViewProj,
+            Matrix4x4 viewportMatrix, DirectBitmap bitmap)
+        {
+            var width = bitmap.Width;
+            var bits = bitmap.Bits;
+            var height = bitmap.Height;
+
+            foreach (var point in pointsToDraw)
+            {
+                var transformed = Vector4.Transform(point, matrixViewProj);
+                var p = transformed / transformed.W;
+
+                if (p.X > -1 && p.X < 1 && p.Y > -1 && p.Y < 1 && p.Z > -1 && p.Z < 1)
+                {
+                    var screenPoint = Vector4.Transform(p, viewportMatrix);
+                    if (screenPoint.X < 2 || screenPoint.X > width - 2 || screenPoint.Y < 2 ||
+                        screenPoint.Y > height - 2)
+                        continue;
+
+                    var x = (int)screenPoint.X;
+                    var y = (int)screenPoint.Y;
+
+                    var index = (y * width + x) * 4;
+
+                    bits[index] = color.B;
+                    bits[index + 1] = color.G;
+                    bits[index + 2] = color.R;
+                }
+            }
         }
 
         private void DrawPoints(MyColor color, Matrix4x4 matrixViewProj, Matrix4x4 viewportMatrix)

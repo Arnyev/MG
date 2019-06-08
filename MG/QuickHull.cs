@@ -10,7 +10,19 @@ namespace MG
         private readonly float _epsilonSquared;
 
         private readonly List<Vector3> _vertexData;
-        public readonly MeshBuilder Mesh;
+        private readonly MeshBuilder _mesh;
+        public QuickHull(List<Vector3> pointCloud)
+        {
+            _vertexData = pointCloud;
+            var extremeValues = GetExtremeValues();
+            var scale = GetScale(extremeValues);
+            _epsilon = _epsilon * scale;
+            _epsilonSquared = _epsilon * _epsilon;
+            var initialPoints = GetFirstFourPointIndices(extremeValues);
+
+            _mesh = GetInitialTetrahedron(initialPoints);
+            CreateConvexHalfEdgeMesh();
+        }
 
         private bool AddPointToFace(Face face, int pointIndex)
         {
@@ -173,7 +185,7 @@ namespace MG
 
                 var topFaceIndex = faceQueue.Dequeue();
 
-                var face = Mesh.Faces[topFaceIndex];
+                var face = _mesh.Faces[topFaceIndex];
                 face.InFaceStack = false;
 
                 if (face.PointsOnPositiveSide == null || face.IsDisabled())
@@ -210,8 +222,8 @@ namespace MG
 
             foreach (var faceIndex in visibleFaces)
             {
-                var disabledFace = Mesh.Faces[faceIndex];
-                var halfEdges = Mesh.GetHalfEdgeIndicesOfFace(disabledFace);
+                var disabledFace = _mesh.Faces[faceIndex];
+                var halfEdges = _mesh.GetHalfEdgeIndicesOfFace(disabledFace);
 
                 for (int j = 0; j < 3; j++)
                 {
@@ -226,12 +238,12 @@ namespace MG
                     }
                     else
                         // Mark for reusal on later iteration step
-                        Mesh.DisableHalfEdge(halfEdges[j]);
+                        _mesh.DisableHalfEdge(halfEdges[j]);
                 }
 
                 // Disable the face, but retain pointer to the points that were on the positive side of it. We need to assign those points
                 // to the new faces we create shortly.
-                var pointsToHandle = Mesh.DisableFace(faceIndex);
+                var pointsToHandle = _mesh.DisableFace(faceIndex);
                 if (pointsToHandle != null)
                     disabledFacePointVectors.AddRange(pointsToHandle);
             }
@@ -240,7 +252,7 @@ namespace MG
             {
                 int newHalfEdgesNeeded = horizonEdges.Count * 2 - disableCounter;
                 for (int i = 0; i < newHalfEdgesNeeded; i++)
-                    newHalfEdgeIndices.Add(Mesh.AddHalfEdge());
+                    newHalfEdgeIndices.Add(_mesh.AddHalfEdge());
             }
         }
 
@@ -255,7 +267,7 @@ namespace MG
             {
                 var faceData = possiblyVisibleFaces.Pop();
 
-                var pvisibleFace = Mesh.Faces[faceData.FaceIndex];
+                var pvisibleFace = _mesh.Faces[faceData.FaceIndex];
 
                 if (pvisibleFace.VisibilityCheckedOnIteration == faceStackElementNumber)
                 {
@@ -272,12 +284,12 @@ namespace MG
                         pvisibleFace.HorizonEdgesOnCurrentIteration = 0;
                         visibleFaces.Add(faceData.FaceIndex);
 
-                        var faceIndices = Mesh.GetHalfEdgeIndicesOfFace(pvisibleFace);
+                        var faceIndices = _mesh.GetHalfEdgeIndicesOfFace(pvisibleFace);
 
                         foreach (var heIndex in faceIndices)
-                            if (Mesh.HalfEdges[heIndex].Opp != faceData.EnteredFromHalfEdge)
+                            if (_mesh.HalfEdges[heIndex].Opp != faceData.EnteredFromHalfEdge)
                                 possiblyVisibleFaces.Push(
-                                    new FaceData(Mesh.HalfEdges[Mesh.HalfEdges[heIndex].Opp].Face, heIndex));
+                                    new FaceData(_mesh.HalfEdges[_mesh.HalfEdges[heIndex].Opp].Face, heIndex));
 
                         continue;
                     }
@@ -298,8 +310,8 @@ namespace MG
             pvisibleFace.IsVisibleFaceOnCurrentIteration = false;
             horizonEdges.Add(faceData.EnteredFromHalfEdge);
             // Store which half edge is the horizon edge.
-            var halfEdges = Mesh.GetHalfEdgeIndicesOfFace(
-                Mesh.Faces[Mesh.HalfEdges[faceData.EnteredFromHalfEdge].Face]);
+            var halfEdges = _mesh.GetHalfEdgeIndicesOfFace(
+                _mesh.Faces[_mesh.HalfEdges[faceData.EnteredFromHalfEdge].Face]);
 
             int ind;
             if (halfEdges[0] == faceData.EnteredFromHalfEdge)
@@ -309,7 +321,7 @@ namespace MG
             else
                 ind = 2;
 
-            Mesh.Faces[Mesh.HalfEdges[faceData.EnteredFromHalfEdge].Face]
+            _mesh.Faces[_mesh.HalfEdges[faceData.EnteredFromHalfEdge].Face]
                     .HorizonEdgesOnCurrentIteration |= 1 << ind;
         }
 
@@ -319,10 +331,10 @@ namespace MG
             var faceStack = new Queue<int>();
 
             for (int i = 0; i < 4; i++)
-                if (Mesh.Faces[i].PointsOnPositiveSide != null && Mesh.Faces[i].PointsOnPositiveSide.Count > 0)
+                if (_mesh.Faces[i].PointsOnPositiveSide != null && _mesh.Faces[i].PointsOnPositiveSide.Count > 0)
                 {
                     faceStack.Enqueue(i);
-                    Mesh.Faces[i].InFaceStack = true;
+                    _mesh.Faces[i].InFaceStack = true;
                 }
 
             return faceStack;
@@ -336,7 +348,7 @@ namespace MG
                 if (point == activePointIndex)
                     continue;
                 foreach (var newFaceIndex in newFaceIndices)
-                    if (AddPointToFace(Mesh.Faces[newFaceIndex], point))
+                    if (AddPointToFace(_mesh.Faces[newFaceIndex], point))
                         break;
             }
         }
@@ -345,7 +357,7 @@ namespace MG
         {
             foreach (var newFaceIndex in newFaceIndices)
             {
-                var newFace = Mesh.Faces[newFaceIndex];
+                var newFace = _mesh.Faces[newFaceIndex];
                 if (newFace.PointsOnPositiveSide == null || newFace.InFaceStack)
                     continue;
 
@@ -362,7 +374,7 @@ namespace MG
             {
                 int ab = horizonEdges[i];
 
-                var horizonEdgeVertexIndices = Mesh.GetVertexIndicesOfHalfEdge(Mesh.HalfEdges[ab]);
+                var horizonEdgeVertexIndices = _mesh.GetVertexIndicesOfHalfEdge(_mesh.HalfEdges[ab]);
                 var a = horizonEdgeVertexIndices.Item1;
                 var b = horizonEdgeVertexIndices.Item2;
                 var c = activePointIndex;
@@ -370,19 +382,19 @@ namespace MG
                 int ca = newHalfEdgeIndices[2 * i + 0];
                 int bc = newHalfEdgeIndices[2 * i + 1];
 
-                var halfEdges = Mesh.HalfEdges;
+                var halfEdges = _mesh.HalfEdges;
 
                 var caOpp = newHalfEdgeIndices[i > 0 ? i * 2 - 1 : 2 * horizonEdges.Count - 1];
                 var bcOpp = newHalfEdgeIndices[(i + 1) * 2 % (horizonEdges.Count * 2)];
 
-                int newFaceIndex = Mesh.AddFace();
+                int newFaceIndex = _mesh.AddFace();
                 newFaceIndices.Add(newFaceIndex);
 
                 halfEdges[ab] = new HalfEdge(halfEdges[ab].EndVertex, halfEdges[ab].Opp, newFaceIndex, bc);
                 halfEdges[bc] = new HalfEdge(c, bcOpp, newFaceIndex, ca);
                 halfEdges[ca] = new HalfEdge(a, caOpp, newFaceIndex, ab);
 
-                var newFace = Mesh.Faces[newFaceIndex];
+                var newFace = _mesh.Faces[newFaceIndex];
 
                 newFace.Plane = new Plane(GetTriangleNormal(_vertexData[a], _vertexData[b], activePoint), activePoint);
 
@@ -392,28 +404,15 @@ namespace MG
             return newFaceIndices;
         }
 
-        public QuickHull(List<Vector3> pointCloud)
-        {
-            _vertexData = pointCloud;
-            var extremeValues = GetExtremeValues();
-            var scale = GetScale(extremeValues);
-            _epsilon = _epsilon * scale;
-            _epsilonSquared = _epsilon * _epsilon;
-            var initialPoints = GetFirstFourPointIndices(extremeValues);
-
-            Mesh = GetInitialTetrahedron(initialPoints);
-            CreateConvexHalfEdgeMesh();
-        }
-
         private bool ReorderHorizonEdges(List<int> horizonEdges)
         {
             for (int i = 0; i < horizonEdges.Count - 1; i++)
             {
-                int endVertex = Mesh.HalfEdges[horizonEdges[i]].EndVertex;
+                int endVertex = _mesh.HalfEdges[horizonEdges[i]].EndVertex;
                 bool foundNext = false;
                 for (int j = i + 1; j < horizonEdges.Count; j++)
                 {
-                    int beginVertex = Mesh.HalfEdges[Mesh.HalfEdges[horizonEdges[j]].Opp].EndVertex;
+                    int beginVertex = _mesh.HalfEdges[_mesh.HalfEdges[horizonEdges[j]].Opp].EndVertex;
                     if (beginVertex == endVertex)
                     {
                         var tmp = horizonEdges[j];
@@ -428,8 +427,8 @@ namespace MG
                     return false;
             }
 
-            if (Mesh.HalfEdges[horizonEdges[horizonEdges.Count - 1]].EndVertex !=
-                Mesh.HalfEdges[Mesh.HalfEdges[horizonEdges[0]].Opp].EndVertex)
+            if (_mesh.HalfEdges[horizonEdges[horizonEdges.Count - 1]].EndVertex !=
+                _mesh.HalfEdges[_mesh.HalfEdges[horizonEdges[0]].Opp].EndVertex)
                 throw new Exception();
 
             return true;
@@ -501,5 +500,9 @@ namespace MG
             }
             return outIndices;
         }
+
+        public List<TriangleIndices> GetMeshIndices() => _mesh.GetMesh();
+
+        public Triangle[] Mesh => MeshBuilder.CreateTriangles(_vertexData, _mesh.GetMesh());
     }
 }

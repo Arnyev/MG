@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Drawing;
 using System.Globalization;
 using System.IO;
@@ -58,47 +59,13 @@ namespace MG
             panel.Controls.Add(GetButton("Deserialize", Deserialize));
             panel.Controls.Add(GetButton("Delete object", DeleteObject));
 
-            var surf1 = new BasicSurface(new SurfaceProperties());
-            var surf2 = new BasicSurface(new SurfaceProperties(), new Vector4(2, 0, 2, 0));
-            var surf3 = new BasicSurface(new SurfaceProperties(), new Vector4(0, 0, 4, 0));
-            var surf4 = new BasicSurface(new SurfaceProperties(), new Vector4(-2, 0, 2, 0));
+            var t = new Torus();
+            var t2 = new Torus();
+            t2.PositionZ = 1;
+            t2.PositionX = 3;
 
-            Vector4 ValueFuncU0(float v) => surf1.GetPoint(v, 1);
-            Vector4 ValueFuncU1(float v) => surf3.GetPoint(v, 0);
-            Vector4 ValueFuncV0(float u) => surf4.GetPoint(1, u);
-            Vector4 ValueFuncV1(float u) => surf2.GetPoint(0, u);
-
-            Vector4 DerivativeFuncU0(float v) => surf1.Dv(v, 1);
-            Vector4 DerivativeFuncU1(float v) => surf3.Dv(v, 0);
-            Vector4 DerivativeFuncV0(float u) => surf4.Du(1, u);
-            Vector4 DerivativeFuncV1(float u) => surf2.Du(0, u);
-
-            var f = 1.0f;
-            Vector4 Duv00() => f * surf1.DuDv(0, 1);
-            Vector4 Dvu00() => f * surf4.DuDv(1, 0);
-
-            Vector4 Duv01() => f * surf1.DuDv(1, 1);
-            Vector4 Dvu01() => f * surf2.DuDv(0, 0);
-
-            Vector4 Duv10() => f * surf3.DuDv(0, 0);
-            Vector4 Dvu10() => f * surf4.DuDv(1, 1);
-
-            Vector4 Duv11() => f * surf3.DuDv(1, 0);
-            Vector4 Dvu11() => f * surf2.DuDv(0, 1);
-
-            surf1.Selected = true;
-            surf2.Selected = true;
-            surf3.Selected = true;
-            _listBox.Items.Add(surf1);
-            _listBox.Items.Add(surf2);
-            _listBox.Items.Add(surf3);
-            //_listBox.Items.Add(surf4);
-
-            var greg = new GregoryPatch(ValueFuncU0, ValueFuncU1, ValueFuncV0, ValueFuncV1, DerivativeFuncU0,
-                DerivativeFuncU1, DerivativeFuncV0, DerivativeFuncV1, Duv00, Dvu00, Duv01, Dvu01, Duv10, Dvu10, Duv11,
-                Dvu11);
-
-            //_listBox.Items.Add(greg);
+            _listBox.Items.Add(t);
+            _listBox.Items.Add(t2);
         }
 
         private void InsertPatch()

@@ -54,12 +54,15 @@
     <Compile Include="BSplineCurve.cs" />
     <Compile Include="BSplineSurface.cs" />
     <Compile Include="Camera.cs" />
+    <Compile Include="KDTree.cs" />
+    <Compile Include="SimpleMesh.cs" />
     <Compile Include="DrawablePoint.cs" />
     <Compile Include="Face.cs" />
     <Compile Include="FrenetCurve.cs" />
     <Compile Include="GregoryPatch.cs" />
     <Compile Include="GregoryPatchContainer.cs" />
     <Compile Include="InterpolatingBSpline.cs" />
+    <Compile Include="IntersectionCalculator.cs" />
     <Compile Include="MeshBuilder.cs" />
     <Compile Include="PointManipulator.cs" />
     <Compile Include="Cursor3D.cs" />
