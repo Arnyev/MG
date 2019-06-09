@@ -188,8 +188,6 @@ namespace MG
             var viewMatrix = _camera.ViewMatrix;
             var matrixViewProj = viewMatrix * perspectiveMatrix;
 
-            DrawIntersections(color, perspectiveMatrix, viewMatrix, viewportMatrix);
-
             foreach (var ob in _objectsController.DrawableObjects)
             {
                 var curve = ob as ICurve;
@@ -228,8 +226,7 @@ namespace MG
         }
 
         private List<Tuple<Vector4, Vector4, bool>> GetLinesToDraw(Matrix4x4 perspectiveMatrix, Vector4[] pointsLines,
-            Matrix4x4 mv, IDrawableObject ob,
-            List<Line> lineList, Matrix4x4 viewportMatrix)
+            Matrix4x4 mv, IDrawableObject ob, List<Line> lineList, Matrix4x4 viewportMatrix)
         {
             var newPoints = pointsLines.Select(t => Vector4.Transform(t, mv)).ToList();
 
@@ -262,39 +259,6 @@ namespace MG
             }
 
             return linesToDraw;
-        }
-
-        private void DrawIntersections(MyColor color, Matrix4x4 perspectiveMatrix, Matrix4x4 viewMatrix, Matrix4x4 viewportMatrix)
-        {
-            var matrixViewProj = viewMatrix * perspectiveMatrix;
-
-            var ta = _objectsController.DrawableObjects.OfType<Torus>().ToList();
-            var t1 = ta[0];
-            var t2 = ta[1];
-
-            int intersectionCount = 200;
-
-            var vertices = new List<Vector3>();
-            var indices = new List<TriangleIndices>();
-
-            t1.GetTriangles(intersectionCount, intersectionCount, indices, vertices);
-
-            var verticesB = new List<Vector3>();
-            var indicesB = new List<TriangleIndices>();
-            t2.GetTriangles(intersectionCount, intersectionCount, indicesB, verticesB);
-
-            var simpleMesh = new SimpleMesh(indices, vertices);
-            var meshB = new SimpleMesh(indicesB, verticesB);
-            var kb2 = new KDTree(simpleMesh, meshB, true);
-
-            var g = Graphics.FromImage(_bitmap.Bitmap);
-            var pen = Pens.Red;
-            var secondPen = Pens.Green;
-            var thirdPen = Pens.BlueViolet;
-            var intersectionPoints = kb2.GetIntersectionPoints();
-
-            foreach (var point in intersectionPoints)
-                DrawPoint(color, matrixViewProj, viewportMatrix, point, g, pen, secondPen, thirdPen, null, true);
         }
 
 

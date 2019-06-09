@@ -224,6 +224,21 @@ namespace MG
             return val * val * val / 6;
         }
 
+        public static float BSplineValue(int index, float val)
+        {
+            switch (index)
+            {
+                case 0:
+                    return GetFirstPart(val);
+                case 1:
+                    return GetSecondPart(val);
+                case 2:
+                    return GetThirdPart(val);
+            }
+
+            return GetFourthPart(val);
+        }
+
         public IReadOnlyList<object> List => _points;
         public void RemoveObject(object o)
         {

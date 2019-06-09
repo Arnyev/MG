@@ -152,7 +152,7 @@ namespace MG
 
                 var vertices = GetVertexIndicesOfFace(Faces[top]);
 
-                indices.Add(new TriangleIndices(vertices[0], vertices[1], vertices[2]));
+                indices.Add(new TriangleIndices(vertices[0], vertices[1], vertices[2], 0));
             }
 
             return indices;

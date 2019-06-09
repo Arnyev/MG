@@ -55,17 +55,24 @@ namespace MG
             panel.Controls.Add(GetButton("Add BSpline surface", AddBsplineSurface));
             panel.Controls.Add(GetButton("Match points", MatchPoints));
             panel.Controls.Add(GetButton("Insert patch", InsertPatch));
+            panel.Controls.Add(GetButton("Add Intersecting Curve", AddIntersectingCurve));
+            panel.Controls.Add(GetButton("Trim", Trim));
             panel.Controls.Add(GetButton("Serialize", Serialize));
             panel.Controls.Add(GetButton("Deserialize", Deserialize));
             panel.Controls.Add(GetButton("Delete object", DeleteObject));
+        }
 
-            var t = new Torus();
-            var t2 = new Torus();
-            t2.PositionZ = 1;
-            t2.PositionX = 3;
+        public void Trim()
+        {
+            var intersectingCurves = _listBox.Items.OfType<IntersectionCurve>().Where(x => x.Selected).ToList();
+            if (intersectingCurves.Count != 1)
+                return;
 
-            _listBox.Items.Add(t);
-            _listBox.Items.Add(t2);
+            var curve = intersectingCurves[0];
+
+            curve.GetPoints(out var parameters);
+
+            curve.A.Trim(parameters);
         }
 
         private void InsertPatch()
@@ -272,6 +279,35 @@ namespace MG
             File.WriteAllLines(filename, s.ToArray());
         }
 
+        private void AddInterpolatingCurveFromIntersectingCurve()
+        {
+            var intersectingCurves = _listBox.Items.OfType<IntersectionCurve>().Where(x => x.Selected).ToList();
+            if (intersectingCurves.Count != 1)
+                return;
+
+            var curve = intersectingCurves[0];
+            var interpolating = new InterpolatingBSpline();
+            var points = curve.GetPoints(out var parameters);
+            foreach (var point in points)
+            {
+                var drawable = new DrawablePoint(point.X, point.Y, point.Z);
+                interpolating.AddPoint(drawable);
+            }
+
+            _listBox.Items.Remove(curve);
+            _listBox.Items.Add(interpolating);
+        }
+
+        private void AddIntersectingCurve()
+        {
+            var intersectingObjects = _listBox.Items.OfType<IIntersecting>().Where(x => x.Selected).ToList();
+            if (intersectingObjects.Count < 1 || intersectingObjects.Count > 2)
+                return;
+
+            _listBox.Items.Add(new IntersectionCurve(intersectingObjects[0], intersectingObjects.Last(), _cursor));
+            _listBox.Refresh();
+        }
+
         private void _listBox2_SelectedIndexChanged(object sender, EventArgs e)
         {
             var selectedObject = _listBox.SelectedItem;
@@ -302,8 +338,6 @@ namespace MG
                 _listBox.Refresh();
             }
         }
-
-
 
         private void AddBsplineSurface()
         {

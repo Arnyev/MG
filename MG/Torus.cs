@@ -1,11 +1,23 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Drawing;
 using System.Linq;
 using System.Numerics;
 
 namespace MG
 {
-    class Torus : IDrawableObject
+    public interface IIntersecting
+    {
+        void GetTriangles(int divisionsU, int divisionsV, List<Vector4> parameterValues, List<TriangleIndices> indices,
+            List<Vector3> points);
+
+        Vector4 GetWorldPoint(float u, float v);
+        Vector3 GetNormalizedWorldNormal(float u, float v);
+        bool Selected { get; }
+        void Trim(List<Vector2> parameters);
+    }
+
+    public class Torus : IDrawableObject, IIntersecting
     {
         private static int _torusNumber = 1;
         public float TubeRadius { get; set; } = 2;
@@ -20,7 +32,6 @@ namespace MG
         public string Name { get; set; } = "Torus " + _torusNumber++;
         public int PointCountH { get; set; } = 30;
         public int PointCountV { get; set; } = 30;
-
 
         public Matrix4x4 GetModelMatrix()
         {
@@ -74,6 +85,15 @@ namespace MG
             return result;
         }
 
+        public Vector4 GetNormal(Vector4 point)
+        {
+            var mult = 2 - 2 * TorusRadius / (float)Math.Sqrt(point.X * point.X + point.Y * point.Y);
+            return new Vector4(point.X * mult, point.Y * mult, 2 * point.Z, 0);
+        }
+
+        public Vector4 GetNormal(float alpha, float beta) =>
+            GetNormal(new Vector4(GetPoint(alpha, beta, TubeRadius, TorusRadius), 1));
+
         public Tuple<Line[], Vector4[]> GetLines()
         {
             var points2Dim = GetPoints();
@@ -100,193 +120,148 @@ namespace MG
 
                     lines[2 * ind] = new Line(ind, nextIndX);
                     lines[2 * ind + 1] = new Line(ind, nextIndY);
+
                     ind++;
                 }
 
             return Tuple.Create(lines, points);
         }
 
+
+
+        public BoundingBox[] GetBoxes(int divisionsU, int divisionsV)
+        {
+            var angleRange = new ParameterRange(0, 2 * (float)Math.PI, 0, 2 * (float)Math.PI);
+
+            GetBoundingBoxes(divisionsU, divisionsV, angleRange, out var triangleIndices, out var triangleVertices, out var angleRanges);
+
+            var boundingBoxes = new BoundingBox[divisionsU * divisionsV];
+
+            for (int i = 0; i < triangleIndices.Length; i++)
+                boundingBoxes[i] = new BoundingBox(triangleIndices[i], triangleVertices[i], angleRanges[i]);
+
+            return boundingBoxes;
+        }
+
+        public void GetTriangles(int divisionsU, int divisionsV, List<Vector4> parameterValues, List<TriangleIndices> indices, List<Vector3> points)
+        {
+            var modelMatrix = GetModelMatrix();
+
+            var pointCount = divisionsU * divisionsV;
+            points.Capacity = pointCount;
+            indices.Capacity = 2 * pointCount;
+            parameterValues.Capacity = pointCount;
+
+            var torusRadius = TorusRadius;
+            var tubeRadius = TubeRadius;
+
+            var diffa = 2 * (float)Math.PI / divisionsU;
+            var diffb = 2 * (float)Math.PI / divisionsV;
+
+            for (int x = 0; x < divisionsU; x++)
+            {
+                var alpha = x * diffa;
+                var sina = Math.Sin(alpha);
+                var cosa = Math.Cos(alpha);
+                var zp = (float)(tubeRadius * sina);
+                var mult = torusRadius + tubeRadius * cosa;
+
+                for (int y = 0; y < divisionsV; y++)
+                {
+                    var beta = y * diffb;
+                    var cosb = Math.Cos(beta);
+                    var sinb = Math.Sin(beta);
+
+                    var xp = (float)(mult * cosb);
+                    var yp = (float)(mult * sinb);
+
+                    parameterValues.Add(new Vector4(alpha, beta, alpha + diffa, beta + diffb));
+
+                    points.Add(Vector3.Transform(new Vector3(xp, yp, zp), modelMatrix));
+
+                    var i = x * divisionsV + y;
+
+                    var indRight = (i + 1) % pointCount;
+                    var indUp = (i + divisionsV) % pointCount;
+                    var indCross = (i + 1 + divisionsV) % pointCount;
+
+                    indices.Add(new TriangleIndices(i, indRight, indUp, parameterValues.Count - 1));
+                    indices.Add(new TriangleIndices(indRight, indCross, indUp, parameterValues.Count - 1));
+                }
+            }
+        }
+
+        private void GetBoundingBoxes(int divisionsU, int divisionsV, ParameterRange parameterRange, out List<TriangleIndices>[] triangleIndices,
+                out List<Vector3>[] triangleVertices, out ParameterRange[] parameterRanges)
+        {
+            var angleForMultiplyRadiusU =
+                2 * (float)Math.PI / (divisionsU * 2 * (float)Math.PI / (parameterRange.MaxU - parameterRange.MinU));
+            var angleForMultiplyRadiusV =
+                2 * (float)Math.PI / (divisionsV * 2 * (float)Math.PI / (parameterRange.MaxV - parameterRange.MinV));
+
+            var torusRadius = TorusRadius;
+            var torusRadiusDiff = TorusRadius / (float)Math.Cos(angleForMultiplyRadiusU / 2) - TorusRadius;
+            var tubeRadius = torusRadiusDiff + TubeRadius / (float)Math.Cos(angleForMultiplyRadiusV / 2);
+
+            triangleIndices = new List<TriangleIndices>[divisionsU * divisionsV];
+            triangleVertices = new List<Vector3>[divisionsU * divisionsV];
+            parameterRanges = new ParameterRange[divisionsU * divisionsV];
+
+            var modelMatrix = GetModelMatrix();
+
+            for (int i = 0; i < divisionsU; i++)
+                for (int j = 0; j < divisionsV; j++)
+                {
+                    var startAlpha = parameterRange.MinU + angleForMultiplyRadiusU * i;
+                    var endAlpha = parameterRange.MinU + angleForMultiplyRadiusU * ((i + 1) % divisionsU);
+                    var startBeta = parameterRange.MinV + angleForMultiplyRadiusV * j;
+                    var endBeta = parameterRange.MinV + angleForMultiplyRadiusV * ((j + 1) % divisionsV);
+
+                    parameterRanges[i * divisionsV + j] = new ParameterRange(startAlpha, endAlpha, startBeta, endBeta);
+
+                    var points = new List<Vector3>();
+
+                    for (float u = 0; u <= 1.0f; u += 0.5f)
+                    {
+                        for (float v = 0; v <= 1.0f; v += 0.5f)
+                        {
+                            var alpha = startAlpha + u * angleForMultiplyRadiusU;
+                            var beta = startBeta + v * angleForMultiplyRadiusV;
+                            var point = GetPoint(alpha, beta, tubeRadius, torusRadius);
+                            points.Add(Vector3.Transform(point, modelMatrix));
+                        }
+                    }
+
+                    triangleIndices[i * divisionsV + j] = new QuickHull(points).GetMeshIndices();
+                    triangleVertices[i * divisionsV + j] = points;
+                }
+        }
+
+        public Vector3 GetNormalizedWorldNormal(float alpha, float beta)
+        {
+            var modelMatrix = GetModelMatrix();
+            var normal = GetNormal(alpha, beta);
+            var normalWorld = Vector4.Transform(normal, modelMatrix);
+            return Vector3.Normalize(new Vector3(normalWorld.X, normalWorld.Y, normalWorld.Z));
+        }
+
+        public bool Selected { get; set; }
+
+        public Vector4 GetWorldPoint(float u, float v) => Vector4.Transform(new Vector4(GetPoint(u, v, TubeRadius, TorusRadius), 1), GetModelMatrix());
+
         private Vector3[,] GetPoints()
         {
-            var diffa = Math.PI * 2 / PointCountH;
-            var diffb = Math.PI * 2 / PointCountV;
+            var diffa = (float)Math.PI * 2 / PointCountH;
+            var diffb = (float)Math.PI * 2 / PointCountV;
             var ret = new Vector3[PointCountH, PointCountV];
             for (int i = 0; i < ret.GetLength(0); i++)
                 for (int j = 0; j < ret.GetLength(1); j++)
-                    ret[i, j] = GetPoint(i * diffa, j * diffb);
+                    ret[i, j] = GetPoint(i * diffa, j * diffb, TubeRadius, TorusRadius);
 
             return ret;
         }
 
-        public List<Tuple<Vector3, Vector3>> GetBoundingBox()
-        {
-            var pointsMine = new List<Vector3>
-            {
-                new Vector3(-TorusRadius - TubeRadius, -TorusRadius - TubeRadius, -TubeRadius), // - - -
-                new Vector3(-TorusRadius - TubeRadius, -TorusRadius - TubeRadius, TubeRadius),  // - - +
-                new Vector3(-TorusRadius - TubeRadius, TorusRadius + TubeRadius, -TubeRadius),  // - + -
-                new Vector3(-TorusRadius - TubeRadius, TorusRadius + TubeRadius, TubeRadius),   // - + +
-                new Vector3(TorusRadius + TubeRadius, -TorusRadius - TubeRadius, -TubeRadius),  // + - -
-                new Vector3(TorusRadius + TubeRadius, -TorusRadius - TubeRadius, TubeRadius),   // + = +
-                new Vector3(TorusRadius + TubeRadius, TorusRadius + TubeRadius, -TubeRadius),   // + + -
-                new Vector3(TorusRadius + TubeRadius, TorusRadius + TubeRadius, TubeRadius),    // + + +
-            };
-
-            var myMatrix = GetModelMatrix();
-            pointsMine = pointsMine.Select(x => Vector3.Transform(x, myMatrix)).ToList();
-
-            var result = new List<Tuple<Vector3, Vector3>>
-            {
-                Tuple.Create(pointsMine[0], pointsMine[1]),
-                Tuple.Create(pointsMine[0], pointsMine[2]),
-                Tuple.Create(pointsMine[0], pointsMine[4]),
-                Tuple.Create(pointsMine[1], pointsMine[3]),
-                Tuple.Create(pointsMine[1], pointsMine[5]),
-                Tuple.Create(pointsMine[2], pointsMine[3]),
-                Tuple.Create(pointsMine[2], pointsMine[6]),
-                Tuple.Create(pointsMine[3], pointsMine[7]),
-                Tuple.Create(pointsMine[4], pointsMine[5]),
-                Tuple.Create(pointsMine[4], pointsMine[6]),
-                Tuple.Create(pointsMine[5], pointsMine[7]),
-                Tuple.Create(pointsMine[6], pointsMine[7]),
-            };
-
-            return result;
-        }
-
-        public List<Tuple<Vector3, Vector3, Vector3>> GetBoxFaces()
-        {
-            var pointsMine = new List<Vector3>
-            {
-                new Vector3(-TorusRadius - TubeRadius, -TorusRadius - TubeRadius, -TubeRadius), // - - -
-                new Vector3(-TorusRadius - TubeRadius, -TorusRadius - TubeRadius, TubeRadius),  // - - +
-                new Vector3(-TorusRadius - TubeRadius, TorusRadius + TubeRadius, -TubeRadius),  // - + -
-                new Vector3(-TorusRadius - TubeRadius, TorusRadius + TubeRadius, TubeRadius),   // - + +
-                new Vector3(TorusRadius + TubeRadius, -TorusRadius - TubeRadius, -TubeRadius),  // + - -
-                new Vector3(TorusRadius + TubeRadius, -TorusRadius - TubeRadius, TubeRadius),   // + - +
-                new Vector3(TorusRadius + TubeRadius, TorusRadius + TubeRadius, -TubeRadius),   // + + -
-                new Vector3(TorusRadius + TubeRadius, TorusRadius + TubeRadius, TubeRadius),    // + + +
-            };
-
-            var myMatrix = GetModelMatrix();
-            pointsMine = pointsMine.Select(x => Vector3.Transform(x, myMatrix)).ToList();
-
-            var result = new List<Tuple<Vector3, Vector3, Vector3>>
-            {
-                Tuple.Create(pointsMine[0], pointsMine[1], pointsMine[3]),  // -x
-                Tuple.Create(pointsMine[0], pointsMine[1], pointsMine[5]),  // -y
-                Tuple.Create(pointsMine[0], pointsMine[4], pointsMine[6]),  // -z
-                Tuple.Create(pointsMine[1], pointsMine[3], pointsMine[7]),  // +z
-                Tuple.Create(pointsMine[2], pointsMine[3], pointsMine[7]),  // + y
-                Tuple.Create(pointsMine[4], pointsMine[6], pointsMine[7]),  // + x 
-            };
-
-            return result;
-        }
-
-        public List<Vector4> Intersection(Torus other)
-        {
-            var myEdges = GetBoundingBox();
-            var otherEdges = other.GetBoundingBox();
-
-            var faces = GetBoxFaces();
-            var otherFaces = other.GetBoxFaces();
-
-            var intersecting = CheckEdgeSquareIntersections(myEdges, otherFaces);
-            if (!intersecting)
-                intersecting = CheckEdgeSquareIntersections(otherEdges, faces);
-
-            return null;
-        }
-
-        public static bool CheckEdgeTriangleIntersections(List<Tuple<Vector3, Vector3>> edges, List<Tuple<Vector3, Vector3, Vector3>> triangles)
-        {
-            bool intersecting = false;
-            foreach (var edge in edges)
-            {
-                foreach (var face in triangles)
-                {
-                    var p1 = face.Item1;
-                    var p2 = face.Item2;
-                    var p3 = face.Item3;
-                    var normal = Vector3.Cross(p1 - p2, p3 - p2);
-                    var l = edge.Item2 - edge.Item1;
-                    var l0 = edge.Item1;
-
-                    var d = Vector3.Dot(p1 - l0, normal) / Vector3.Dot(l, normal);
-                    if (float.IsNaN(d) || d < 0 || d > 1)
-                        continue;
-
-                    var newPoint = d * l + l0;
-
-                    var v0 = p2 - p1;
-                    var v1 = p3 - p1;
-                    var v2 = newPoint - p1;
-                    float d00 = Vector3.Dot(v0, v0);
-                    float d01 = Vector3.Dot(v0, v1);
-                    float d11 = Vector3.Dot(v1, v1);
-                    float d20 = Vector3.Dot(v2, v0);
-                    float d21 = Vector3.Dot(v2, v1);
-                    float denom = d00 * d11 - d01 * d01;
-                    var v = (d11 * d20 - d01 * d21) / denom;
-                    var w = (d00 * d21 - d01 * d20) / denom;
-                    var u = 1.0f - v - w;
-
-                    if (v >= 0 && v <= 1 && u >= 0 && u <= 1 && w >= 0 && w <= 1)
-                    {
-                        intersecting = true;
-                        break;
-                    }
-                }
-
-                if (intersecting)
-                    break;
-            }
-
-            return intersecting;
-        }
-
-        public static bool CheckEdgeSquareIntersections(List<Tuple<Vector3, Vector3>> edges, List<Tuple<Vector3, Vector3, Vector3>> squares)
-        {
-            bool intersecting = false;
-            foreach (var edge in edges)
-            {
-                foreach (var face in squares)
-                {
-                    var p1 = face.Item1;
-                    var p2 = face.Item2;
-                    var p3 = face.Item3;
-                    var normal = Vector3.Cross(p1 - p2, p3 - p2);
-                    var l = edge.Item2 - edge.Item1;
-                    var l0 = edge.Item1;
-
-                    var d = Vector3.Dot(p1 - l0, normal) / Vector3.Dot(l, normal);
-                    if (float.IsNaN(d) || d < 0 || d > 1)
-                        continue;
-
-                    var newPoint = d * l + l0;
-                    var dir1 = p1 - p2;
-                    var dir2 = p3 - p2;
-
-                    var v1 = newPoint - p2;
-                    var d1 = Vector3.Dot(v1, dir1) / dir1.LengthSquared();
-                    var d2 = Vector3.Dot(v1, dir2) / dir2.LengthSquared();
-
-                    if (d1 >= 0 && d1 <= 1 && d2 >= 0 && d2 <= 1)
-                    {
-                        intersecting = true;
-                        break;
-                    }
-                }
-
-                if (intersecting)
-                    break;
-            }
-
-            return intersecting;
-        }
-
-        private Vector3 GetPoint(double alpha, double beta)
+        public static Vector3 GetPoint(float alpha, float beta, float TubeRadius, float TorusRadius)
         {
             var cosa = Math.Cos(alpha);
             var cosb = Math.Cos(beta);
@@ -298,6 +273,27 @@ namespace MG
             var y = (float)(mult * sinb);
             var z = (float)(TubeRadius * sina);
             return new Vector3(x, y, z);
+        }
+
+
+        public void Trim(List<Vector2> parameters)
+        {
+        }
+    }
+
+    public struct ParameterRange
+    {
+        public readonly float MinU;
+        public readonly float MaxU;
+        public readonly float MinV;
+        public readonly float MaxV;
+
+        public ParameterRange(float minU, float maxU, float minV, float maxV)
+        {
+            MinU = minU;
+            MaxU = maxU;
+            MinV = minV;
+            MaxV = maxV;
         }
     }
 }

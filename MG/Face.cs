@@ -34,13 +34,28 @@ namespace MG
             ParameterMax = parameterMax;
         }
 
+
+        public IntersectionRange(Vector4 vA,Vector4 vB, bool parametersPeriodic, float parameterMax)
+        {
+            AMinU = vA.X;
+            AMinV = vA.Y;
+            AMaxU = vA.Z;
+            AMaxV = vA.W;
+
+            BMinU = vB.X;
+            BMinV = vB.Y;
+            BMaxU = vB.Z;
+            BMaxV = vB.W;
+
+            ParametersPeriodic = parametersPeriodic;
+            ParameterMax = parameterMax;
+        }
+
         public bool IsAdjacent(IntersectionRange other)
         {
             const float e = 1e-4f;
             var adjacentAU = Math.Abs(AMinU - other.AMinU) < e || Math.Abs(AMinU - other.AMaxU) < e || Math.Abs(AMaxU - other.AMinU) < e;
             var adjacentAV = Math.Abs(AMinV - other.AMinV) < e || Math.Abs(AMinV - other.AMaxV) < e || Math.Abs(AMaxV - other.AMinV) < e;
-            var adjacentBU = Math.Abs(BMinU - other.BMinU) < e || Math.Abs(BMinU - other.BMaxU) < e || Math.Abs(BMaxU - other.BMinU) < e;
-            var adjacentBV = Math.Abs(BMinV - other.BMinV) < e || Math.Abs(BMinV - other.BMaxV) < e || Math.Abs(BMaxV - other.BMinV) < e;
 
             if (ParametersPeriodic)
             {
@@ -69,7 +84,7 @@ namespace MG
         public readonly float MaxY;
         public readonly float MaxZ;
 
-        public BoundingBox(Triangle[] triangles, AngleRange range)
+        public BoundingBox(Triangle[] triangles, ParameterRange range)
         {
             Triangles = triangles;
             MinU = range.MinU;
@@ -86,7 +101,7 @@ namespace MG
             MinZ = triangles.Min(t => t.MinZ);
         }
 
-        public BoundingBox(List<TriangleIndices> triangleIndices, List<Vector3> points, AngleRange range)
+        public BoundingBox(List<TriangleIndices> triangleIndices, List<Vector3> points, ParameterRange range)
         : this(triangleIndices.Select(x => new Triangle(points[x.A], points[x.B], points[x.C])).ToArray(), range)
         {
         }

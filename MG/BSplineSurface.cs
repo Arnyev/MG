@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Drawing;
 using System.Linq;
 using System.Numerics;
 using System.Text;
@@ -8,13 +9,16 @@ using System.Windows.Forms;
 
 namespace MG
 {
-    class BSplineSurface : IDrawableObject, ICurve
+    class BSplineSurface : IDrawableObject, ICurve, IIntersecting
     {
         private readonly int _countU;
         private readonly int _countV;
         private readonly bool _isTube;
         private readonly List<DrawablePoint> _points = new List<DrawablePoint>();
         public IReadOnlyList<DrawablePoint> Points => _points;
+        private const int ParameterRangePrecision = 1000;
+        private bool Trimmed;
+        private bool[,] ParameterRange;
 
         public int DivisionsU { get; set; } = 4;
         public int DivisionsV { get; set; } = 4;
@@ -32,6 +36,11 @@ namespace MG
                 return;
             }
 
+            ParameterRange = new bool[ParameterRangePrecision + 1, ParameterRangePrecision + 1];
+            for (int i = 0; i < ParameterRangePrecision + 1; i++)
+                for (int j = 0; j < ParameterRangePrecision + 1; j++)
+                    ParameterRange[i, j] = true;
+
             if (!_isTube)
             {
                 var scaleU = properties.SizeU / _countU;
@@ -48,7 +57,7 @@ namespace MG
 
                 for (int i = 0; i < _countU; i++)
                     for (int j = 0; j < _countV; j++)
-                        _points.Add(new DrawablePoint((float)Math.Cos(j * scaleV), (float)Math.Sin(j * scaleV), i * scaleU));
+                        _points.Add(new DrawablePoint(properties.SizeV * (float)Math.Cos(j * scaleV), properties.SizeV * (float)Math.Sin(j * scaleV), i * scaleU));
             }
         }
 
@@ -97,8 +106,17 @@ namespace MG
                         var u3 = BSplineCurve.GetThirdPart(curveU);
                         var u4 = BSplineCurve.GetFourthPart(curveU);
 
+                        var paramU = (int)((patchU - 3 + curveU) * ParameterRangePrecision / (_countU - 3));
+
                         for (float t = 0; t < 1.0f; t += 1.0f / count)
                         {
+                            if (Trimmed)
+                            {
+                                var paramV = (int)((patchV - startV + t) * ParameterRangePrecision / (_countV - startV));
+                                if (!ParameterRange[paramU, paramV])
+                                    continue;
+                            }
+
                             var t1 = t * t * t / 6;
                             var t2 = (1 + 3 * t + 3 * t * t - 3 * t * t * t) / 6;
                             var t3 = (4 - 6 * t * t + 3 * t * t * t) / 6;
@@ -120,8 +138,17 @@ namespace MG
                         var u3 = BSplineCurve.GetThirdPart(curveV);
                         var u4 = BSplineCurve.GetFourthPart(curveV);
 
+                        var paramV = (int)((patchV - startV + curveV) * ParameterRangePrecision / (_countV - startV));
+
                         for (float t = 0; t < 1.0f; t += 1.0f / count)
                         {
+                            if (Trimmed)
+                            {
+                                var paramU = (int)((patchU - 3 + t) * ParameterRangePrecision / (_countU - 3));
+                                if (!ParameterRange[paramU, paramV])
+                                    continue;
+                            }
+
                             var t1 = t * t * t / 6;
                             var t2 = (1 + 3 * t + 3 * t * t - 3 * t * t * t) / 6;
                             var t3 = (4 - 6 * t * t + 3 * t * t * t) / 6;
@@ -194,5 +221,163 @@ namespace MG
             set => _points.ForEach(x => x.Selected = value);
         }
 
+        public void GetTriangles(int divisionsU, int divisionsV, List<Vector4> parameterValues, List<TriangleIndices> indices, List<Vector3> points)
+        {
+            var startU = 3;
+            var startV = _isTube ? 0 : 3;
+
+            var pointsPerPathU = (int)Math.Ceiling((float)divisionsU / (_countU - 3));
+            var pointsPerPathV = (int)Math.Ceiling((float)divisionsV / (_countV - startV));
+
+            var maxU = pointsPerPathU * (_countU - 3);
+            var maxV = pointsPerPathV * (_countV - startV);
+
+            var pointCount = maxU * maxV;
+
+            var valuesU = new float[pointsPerPathU, 4];
+            var valuesV = new float[pointsPerPathV, 4];
+
+            for (int i = 0; i < pointsPerPathU; i++)
+            {
+                var u = i * 1.0f / (pointsPerPathU - 1);
+                for (int j = 0; j < 4; j++)
+                    valuesU[i, j] = BSplineCurve.BSplineValue(j, u);
+            }
+
+            for (int i = 0; i < pointsPerPathV; i++)
+            {
+                var v = i * 1.0f / (pointsPerPathV - 1);
+                for (int j = 0; j < 4; j++)
+                    valuesV[i, j] = BSplineCurve.BSplineValue(j, v);
+            }
+
+            var diffU = 1.0f / (pointsPerPathU - 1);
+            var diffV = 1.0f / (pointsPerPathV - 1);
+
+            for (int indexU = 0; indexU < maxU; indexU++)
+                for (int indexV = 0; indexV < maxV; indexV++)
+                {
+                    var patchU = indexU / pointsPerPathU + startU;
+                    var ui = indexU % pointsPerPathU;
+
+                    var patchV = indexV / pointsPerPathV + startV;
+                    var vi = indexV % pointsPerPathV;
+
+                    var deBoorPoints = GetDeBoorPoints(patchU, patchV);
+
+                    var point = new Vector4();
+                    for (int i = 0; i < 4; i++)
+                        for (int j = 0; j < 4; j++)
+                            point += deBoorPoints[i * 4 + j] * valuesU[ui, i] * valuesV[vi, j];
+
+                    points.Add(new Vector3(point.X, point.Y, point.Z));
+                    var u = patchU + (float)ui / (pointsPerPathU - 1);
+                    var v = patchV + (float)vi / (pointsPerPathV - 1);
+
+                    parameterValues.Add(new Vector4(u, v, u + diffU, v + diffV));
+
+                    if (indexU != maxU - 1 && (_isTube || indexV != maxV - 1))
+                    {
+                        var ind = indexU * maxV + indexV;
+                        var ind2 = (ind + 1) % pointCount;
+                        var ind3 = (ind + maxV) % pointCount;
+                        var ind4 = (ind + maxV + 1) % pointCount;
+
+                        indices.Add(new TriangleIndices(ind, ind2, ind3, parameterValues.Count - 1));
+                        indices.Add(new TriangleIndices(ind2, ind4, ind3, parameterValues.Count - 1));
+                    }
+                }
+        }
+
+        public Vector4 GetWorldPoint(float u, float v)
+        {
+            int patchU;
+            var startV = _isTube ? 0 : 3;
+
+            if (u >= _countU)
+            {
+                patchU = _countU - 1;
+                u = 1;
+            }
+            else if (u <= 3)
+            {
+                u = 0;
+                patchU = 3;
+            }
+            else
+            {
+                patchU = (int)u;
+                u = u - patchU;
+            }
+
+            int patchV;
+            if (v >= _countV - 3 + startV)
+            {
+                patchV = _countV - 3 + startV - 1;
+                v = 1;
+            }
+            else if (v <= startV)
+            {
+                v = 0;
+                patchV = startV;
+            }
+            else
+            {
+                patchV = (int)v;
+                v = v - patchV;
+            }
+
+            var deBoorPoints = GetDeBoorPoints(patchU, patchV);
+
+            var point = new Vector4();
+            for (int i = 0; i < 4; i++)
+                for (int j = 0; j < 4; j++)
+                    point += deBoorPoints[i * 4 + j] * BSplineCurve.BSplineValue(i, u) * BSplineCurve.BSplineValue(j, v);
+
+            return point;
+        }
+
+        public void Trim(List<Vector2> parameters)
+        {
+            if (parameters.Count < 3)
+                return;
+
+            var eps = 0.1;
+            var first = parameters[0];
+            var last = parameters[parameters.Count - 1];
+
+            var circle = (first - last).Length() < eps;
+            var firstBound = Math.Abs(first.X) < eps || Math.Abs(_countU - first.X) < eps || Math.Abs(first.Y) < eps ||
+                             Math.Abs(_countV - first.Y) < eps;
+
+            var lastBound = Math.Abs(last.X) < eps || Math.Abs(_countU - last.X) < eps || Math.Abs(last.Y) < eps ||
+                            Math.Abs(_countV - last.Y) < eps;
+
+            if (!circle && (!firstBound || !lastBound))
+                return;
+
+            var points = parameters.Select(x =>
+                    new Point((int)((x.X - 3) * 1000 / (_countU - 3)), (int)((x.Y - (_isTube ? 0 : 3)) * 1000 / (_countV - (_isTube ? 0 : 3)))))
+                .ToArray();
+
+            ScanLineAlgorithm.FillPolygon(ParameterRange, points);
+            Trimmed = true;
+        }
+
+        public Vector3 GetNormalizedWorldNormal(float u, float v)
+        {
+            const float diff = 0.0001f;
+            var point1 = GetWorldPoint(u, v);
+            var point2 = GetWorldPoint(u + diff, v);
+            var point3 = GetWorldPoint(u, v + diff);
+
+            var d1 = point2 - point1;
+            var d2 = point3 - point1;
+
+            var v1 = new Vector3(d1.X, d1.Y, d1.Z);
+            var v2 = new Vector3(d2.X, d2.Y, d2.Z);
+
+            return Vector3.Normalize(Vector3.Cross(v1, v2));
+        }
     }
 }

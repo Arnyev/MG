@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Drawing;
 using System.Linq;
 using System.Numerics;
 using System.Text;
@@ -26,12 +27,17 @@ namespace MG
         public float SizeV { get; set; } = 2;
     }
 
-    public class BasicSurface : IDrawableObject, ICurve
+    public class BasicSurface : IDrawableObject, ICurve, IIntersecting
     {
         private readonly int _countU;
         private readonly int _countV;
         private readonly bool _isTube;
+        private const int ParameterRangePrecision = 1000;
+        private bool Trimmed;
+        private bool[,] ParameterRange;
+
         private readonly List<DrawablePoint> _points = new List<DrawablePoint>();
+
         public IReadOnlyList<DrawablePoint> Points => _points;
 
         public bool IsTube => _isTube;
@@ -40,6 +46,11 @@ namespace MG
             _countU = properties.CountU;
             _countV = properties.CountV;
             _isTube = properties.IsTube;
+
+            ParameterRange = new bool[ParameterRangePrecision + 1, ParameterRangePrecision + 1];
+            for (int i = 0; i < ParameterRangePrecision + 1; i++)
+                for (int j = 0; j < ParameterRangePrecision + 1; j++)
+                    ParameterRange[i, j] = true;
 
             if (_countU < 1 || _countV < 1)
                 return;
@@ -445,7 +456,9 @@ namespace MG
         }
 
         public bool DrawLines { get; set; }
+
         public int DivisionsU { get; set; } = 4;
+
         public int DivisionsV { get; set; } = 4;
 
         public bool AllPointsSelected
@@ -467,8 +480,17 @@ namespace MG
 
                     for (float curveU = 0; curveU <= 1.0; curveU += 1.0f / (DivisionsU - 1))
                     {
+                        var paramU = (int)((patchU + curveU) * ParameterRangePrecision / _countU);
+
                         for (float t = 0; t < 1.0f; t += 1.0f / count)
                         {
+                            if (Trimmed)
+                            {
+                                var paramV = (int)((patchV + t) * ParameterRangePrecision / _countV);
+                                if (!ParameterRange[paramU, paramV])
+                                    continue;
+                            }
+
                             var point = new Vector4();
                             for (int i = 0; i < 4; i++)
                                 for (int j = 0; j < 4; j++)
@@ -480,8 +502,17 @@ namespace MG
 
                     for (float curveV = 0; curveV <= 1.0; curveV += 1.0f / (DivisionsV - 1))
                     {
+                        var paramV = (int)((patchV + curveV) * ParameterRangePrecision / _countV);
+
                         for (float t = 0; t < 1.0f; t += 1.0f / count)
                         {
+                            if (Trimmed)
+                            {
+                                var paramU = (int)((patchU + t) * ParameterRangePrecision / _countU);
+                                if (!ParameterRange[paramU, paramV])
+                                    continue;
+                            }
+
                             var point = new Vector4();
                             for (int i = 0; i < 4; i++)
                                 for (int j = 0; j < 4; j++)
@@ -550,5 +581,155 @@ namespace MG
 
         static int Nr = 1;
         public string Name { get; set; } = "Basic_surface" + Nr++;
+        public void GetTriangles(int divisionsU, int divisionsV, List<Vector4> parameterValues, List<TriangleIndices> indices, List<Vector3> points)
+        {
+            var pointCount = divisionsU * divisionsV;
+            var pointsPerPathU = (int)Math.Ceiling((float)divisionsU / _countU);
+            var pointsPerPathV = (int)Math.Ceiling((float)divisionsV / _countV);
+
+            var bernsteinValuesU = new float[pointsPerPathU, 4];
+            var bernsteinValuesV = new float[pointsPerPathV, 4];
+
+            for (int i = 0; i < pointsPerPathU; i++)
+            {
+                var u = i * 1.0f / (pointsPerPathU - 1);
+                for (int j = 0; j < 4; j++)
+                    bernsteinValuesU[i, j] = GetBernsteinValue(j, u);
+            }
+
+            for (int i = 0; i < pointsPerPathV; i++)
+            {
+                var v = i * 1.0f / (pointsPerPathV - 1);
+                for (int j = 0; j < 4; j++)
+                    bernsteinValuesV[i, j] = GetBernsteinValue(j, v);
+            }
+
+            var diffU = 1.0f / (pointsPerPathU - 1);
+            var diffV = 1.0f / (pointsPerPathV - 1);
+
+            for (int indexU = 0; indexU < divisionsU; indexU++)
+                for (int indexV = 0; indexV < divisionsV; indexV++)
+                {
+                    var patchU = indexU / pointsPerPathU;
+                    var ui = indexU % pointsPerPathU;
+
+                    var patchV = indexV / pointsPerPathV;
+                    var vi = indexV % pointsPerPathV;
+
+                    var bezierPoints = GetBezierPoints(patchU, patchV);
+
+                    var point = new Vector4();
+                    for (int i = 0; i < 4; i++)
+                        for (int j = 0; j < 4; j++)
+                            point += bezierPoints[i * 4 + j] * bernsteinValuesU[ui, i] * bernsteinValuesV[vi, j];
+
+                    points.Add(new Vector3(point.X, point.Y, point.Z));
+                    var u = patchU + (float)ui / (pointsPerPathU - 1);
+                    var v = patchV + (float)vi / (pointsPerPathV - 1);
+
+                    parameterValues.Add(new Vector4(u, v, u + diffU, v + diffV));
+
+                    if (indexU != divisionsU - 1 && (_isTube || indexV != divisionsV - 1))
+                    {
+                        var ind = indexU * divisionsV + indexV;
+                        var ind2 = (ind + 1) % pointCount;
+                        var ind3 = (ind + divisionsV) % pointCount;
+                        var ind4 = (ind + divisionsV + 1) % pointCount;
+
+                        indices.Add(new TriangleIndices(ind, ind2, ind3, parameterValues.Count - 1));
+                        indices.Add(new TriangleIndices(ind2, ind4, ind3, parameterValues.Count - 1));
+                    }
+                }
+        }
+
+        public Vector4 GetWorldPoint(float u, float v)
+        {
+            int patchU;
+
+            if (u >= _countU)
+            {
+                patchU = _countU - 1;
+                u = 1;
+            }
+            else if (u <= 0)
+            {
+                u = 0;
+                patchU = 0;
+            }
+            else
+            {
+                patchU = (int)u;
+                u = u - patchU;
+            }
+
+            int patchV;
+            if (v >= _countV)
+            {
+                patchV = _countV - 1;
+                v = 1;
+            }
+            else if (v <= 0)
+            {
+                v = 0;
+                patchV = 0;
+            }
+            else
+            {
+                patchV = (int)v;
+                v = v - patchV;
+            }
+
+            var bezierPoints = GetBezierPoints(patchU, patchV);
+
+            var point = new Vector4();
+            for (int i = 0; i < 4; i++)
+                for (int j = 0; j < 4; j++)
+                    point += bezierPoints[i * 4 + j] * GetBernsteinValue(i, u) * GetBernsteinValue(j, v);
+
+            return point;
+        }
+
+        public void Trim(List<Vector2> parameters)
+        {
+            if (parameters.Count < 3)
+                return;
+
+            var eps = 0.1;
+            var first = parameters[0];
+            var last = parameters[parameters.Count - 1];
+
+            var circle = (first - last).Length() < eps;
+            var firstBound = Math.Abs(first.X) < eps || Math.Abs(_countU - first.X) < eps || Math.Abs(first.Y) < eps ||
+                             Math.Abs(_countV - first.Y) < eps;
+
+            var lastBound = Math.Abs(last.X) < eps || Math.Abs(_countU - last.X) < eps || Math.Abs(last.Y) < eps ||
+                             Math.Abs(_countV - last.Y) < eps;
+
+            if (!circle && (!firstBound || !lastBound))
+                return;
+
+            var points = parameters.Select(x =>
+                    new Point((int)(x.X * 1000 / _countU), (int)(x.Y * 1000 / _countV)))
+                .ToArray();
+
+            ScanLineAlgorithm.FillPolygon(ParameterRange, points);
+            Trimmed = true;
+        }
+
+        public Vector3 GetNormalizedWorldNormal(float u, float v)
+        {
+            const float diff = 0.0001f;
+            var point1 = GetWorldPoint(u, v);
+            var point2 = GetWorldPoint(u + diff, v);
+            var point3 = GetWorldPoint(u, v + diff);
+
+            var d1 = point2 - point1;
+            var d2 = point3 - point1;
+
+            var v1 = new Vector3(d1.X, d1.Y, d1.Z);
+            var v2 = new Vector3(d2.X, d2.Y, d2.Z);
+
+            return Vector3.Normalize(Vector3.Cross(v1, v2));
+        }
     }
 }
