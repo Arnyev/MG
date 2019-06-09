@@ -292,8 +292,6 @@ namespace MG
         public Vector4 GetWorldPoint(float u, float v)
         {
             int patchU;
-            var startV = _isTube ? 0 : 3;
-
             if (u >= _countU)
             {
                 patchU = _countU - 1;
@@ -311,18 +309,34 @@ namespace MG
             }
 
             int patchV;
-            if (v >= _countV - 3 + startV)
+            if (!_isTube)
             {
-                patchV = _countV - 3 + startV - 1;
-                v = 1;
-            }
-            else if (v <= startV)
-            {
-                v = 0;
-                patchV = startV;
+                if (v >= _countV)
+                {
+                    patchV = _countV - 1;
+                    v = 1;
+                }
+                else if (v <= 3)
+                {
+                    v = 0;
+                    patchV = 3;
+                }
+                else
+                {
+                    patchV = (int) v;
+                    v = v - patchV;
+                }
             }
             else
             {
+                if (v >= _countV)
+                    v -= _countV;
+                else if (v < 0)
+                    v += _countV;
+
+                if (v >= _countV || v < 0)
+                    v = 0;
+
                 patchV = (int)v;
                 v = v - patchV;
             }
