@@ -2,7 +2,7 @@
 {
     internal class NewtonRaphsonEquationSolver
     {
-        private static void Iteration(EquationSystem system, float[] x0, ref float[] x1)
+        private static bool Iteration(EquationSystem system, float[] x0, ref float[] x1)
         {
             var dimension = x0.Length;
             var jacobian = new float[dimension][];
@@ -18,7 +18,8 @@
             system.Calculate(x0, functionValues);
             float[][] inversed;
 
-            MatrixCalculationHelper.InverseMatrix(jacobian, out inversed);
+            if (!MatrixCalculationHelper.InverseMatrix(jacobian, out inversed))
+                return false;
 
             for (int i = 0; i < dimension; i++)
             {
@@ -26,6 +27,8 @@
                 for (int j = 0; j < dimension; j++)
                     x1[i] -= inversed[i][j] * functionValues[j];
             }
+
+            return true;
         }
 
         public static bool Solve(EquationSystem system, float[] x0, out float[] x, int iterations, float precision, out int iterationsUsed)
@@ -39,7 +42,9 @@
 
             for (int index = 1; index <= iterations; ++index)
             {
-                Iteration(system, x01, ref x);
+                if (!Iteration(system, x01, ref x))
+                    return false;
+
                 system.Calculate(x,  y);
 
                 float num = 0;

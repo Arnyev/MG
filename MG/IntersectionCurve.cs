@@ -12,8 +12,8 @@ namespace MG
         public readonly IIntersecting B;
         private readonly Vector4 cursor;
 
-        public float Division { get; set; } = 0.1f;
-        public int TriangleCount { get; set; } = 10;
+        public float Division { get; set; } = 0.01f;
+        public int TriangleCount { get; set; } = 40;
 
         public float MinimumDifference
         {
@@ -30,7 +30,7 @@ namespace MG
             this.cursor = cursor.Position;
         }
 
-        private static List<Vector2> ComputeApproximatingPoints(List<IntersectionRange> ranges, IIntersecting a, out List<Vector4> drawingPoints)
+        private static List<Vector2> ComputeApproximatingPoints(List<Intersection> ranges, IIntersecting a, out List<Vector4> drawingPoints)
         {
             drawingPoints = new List<Vector4>();
 
@@ -175,17 +175,12 @@ namespace MG
             return closestArrays;
         }
 
-        private static List<Vector2> GetPointsFromTriangles(List<IntersectionRange> ranges)
+        private static List<Vector2> GetPointsFromTriangles(List<Intersection> ranges)
         {
             var pointsSet = new HashSet<Vector2>();
 
             foreach (var range in ranges)
-            {
-                pointsSet.Add(new Vector2(range.AMinU, range.AMinV));
-                pointsSet.Add(new Vector2(range.AMinU, range.AMaxV));
-                pointsSet.Add(new Vector2(range.AMaxU, range.AMinV));
-                pointsSet.Add(new Vector2(range.AMaxU, range.AMaxV));
-            }
+                pointsSet.Add(range.A);
 
             var points = pointsSet.ToList();
             return points;
@@ -196,35 +191,33 @@ namespace MG
             var minimumDifference = MinimumDifference;
             parameterValues = new List<Vector2>();
 
-            GetIntersections(minimumDifference, out List<IntersectionRange> ranges, out var intersectionPoints);
+            GetIntersections(minimumDifference, out List<Intersection> intersectionsTriangulation, out var intersectionPoints);
 
-            if (ranges.Count == 0)
+            if (intersectionsTriangulation.Count == 0)
                 return new List<Vector4>();
 
             var closestIndex = -1;
             if (minimumDifference > 0)
-                closestIndex = SelectBestSelfIntersection(intersectionPoints, ranges, closestIndex);
+                closestIndex = SelectBestSelfIntersection(intersectionPoints, intersectionsTriangulation, closestIndex);
             else
                 closestIndex = SelectClosestToCursor(intersectionPoints, closestIndex);
 
-            var range = ranges[closestIndex];
+            var intersection = intersectionsTriangulation[closestIndex];
 
-            var intersection = new Vector4(range.AMinU, range.AMinV, range.BMinU, range.BMinV);
-
-            var intersections = new List<Vector4>();
+            var intersections = new List<Intersection>();
 
             var list = new List<Vector4>();
             int firstPointsCount = 7;
 
-            var standardOk = TryStandardFirstPoints(minimumDifference, firstPointsCount, list, intersections, ranges, ref intersection);
+            var standardOk = TryStandardFirstPoints(minimumDifference, firstPointsCount, list, intersections, intersectionsTriangulation, ref intersection);
 
             if (!standardOk)
-                return TriangulationPoints(ref parameterValues, ranges);
+                return TriangulationPoints(ref parameterValues, intersectionsTriangulation);
 
             var expectedSuccedingDifference = Division / 4;
             var midIndex = AddRestOfPoints(list, expectedSuccedingDifference, intersection, minimumDifference, 1, intersections);
 
-            parameterValues = intersections.Select(x => new Vector2(x.X, x.Y)).ToList();
+            parameterValues = intersections.Select(x => x.A).ToList();
             intersection = intersections.First();
 
             if ((list.Last() - list.First()).Length() > Division)
@@ -232,12 +225,21 @@ namespace MG
                 if (GetFirstPoints(A, B, Division, minimumDifference, firstPointsCount, list, -1, intersections,
                     ref intersection))
                 {
-                    parameterValues = intersections.Select(x => new Vector2(x.X, x.Y)).ToList();
+                    while (list.Count > midIndex - 2)
+                    {
+                        list.RemoveAt(list.Count - 1);
+                        intersections.RemoveAt(intersections.Count - 1);
+
+                    }
+                    parameterValues = intersections.Select(x => x.A).ToList();
+
+                    var pa = list[list.Count - 2];
+                    var pb = list.Last();
                     return list;
                 }
 
                 AddRestOfPoints(list, expectedSuccedingDifference, intersection, minimumDifference, -1, intersections);
-                parameterValues = intersections.Select(x => new Vector2(x.X, x.Y)).ToList();
+                parameterValues = intersections.Select(x => x.A).ToList();
 
                 ReorderList(list, midIndex, parameterValues);
             }
@@ -252,7 +254,7 @@ namespace MG
             return list;
         }
 
-        private List<Vector4> TriangulationPoints(ref List<Vector2> parameterValues, List<IntersectionRange> ranges)
+        private List<Vector4> TriangulationPoints(ref List<Vector2> parameterValues, List<Intersection> ranges)
         {
             if (A != B)
             {
@@ -263,10 +265,9 @@ namespace MG
                 return new List<Vector4>();
         }
 
-        private bool TryStandardFirstPoints(float minimumDifference, int firstPointsCount, List<Vector4> list, List<Vector4> intersections,
-            List<IntersectionRange> ranges, ref Vector4 intersection)
+        private bool TryStandardFirstPoints(float minimumDifference, int firstPointsCount, List<Vector4> list, List<Intersection> intersections,
+            List<Intersection> inIntersections, ref Intersection intersection)
         {
-            IntersectionRange range;
             var failed = true;
             int tryCounts = 10;
             if (GetFirstPoints(A, B, Division, minimumDifference, firstPointsCount, list, 1, intersections,
@@ -275,10 +276,10 @@ namespace MG
                 var rand = new Random(firstPointsCount);
                 for (int i = 0; i < tryCounts; i++)
                 {
-                    var ind = rand.Next(ranges.Count);
-                    range = ranges[ind];
-                    intersection = new Vector4(range.AMinU, range.AMinV, range.BMinU, range.BMinV);
-
+                    var ind = rand.Next(inIntersections.Count);
+                    intersection = inIntersections[ind];
+                    list.Clear();
+                    intersections.Clear();
                     if (!GetFirstPoints(A, B, Division, minimumDifference, firstPointsCount, list, 1,
                         intersections, ref intersection))
                     {
@@ -293,24 +294,20 @@ namespace MG
             return !failed;
         }
 
-        private int AddRestOfPoints(List<Vector4> list, float expectedSuccedingDifference, Vector4 intersection, float minimumDifference,
-            int direction, List<Vector4> intersections)
+        private int AddRestOfPoints(List<Vector4> list, float expectedSuccedingDifference, Intersection intersection, float minimumDifference,
+            int direction, List<Intersection> intersections)
         {
-            int midIndex = 0;
+            var midIndex = list.Count;
 
             while ((list.Last() - list.First()).Length() > Division / 2 &&
                    (list.Last() - list[list.Count - 2]).Length() > expectedSuccedingDifference && list.Count < 10000)
             {
-                try
-                {
-                    intersection = GetIntersectionPoint(A, B, Division, intersection, minimumDifference, direction);
-                }
-                catch
-                {
+                if (!GetIntersectionPoint(A, B, Division, intersection, minimumDifference, direction,
+                    out var newIntersection))
                     break;
-                }
 
-                var worldSpacePoint = A.GetWorldPoint(intersection.X, intersection.Y);
+                intersection = newIntersection;
+                var worldSpacePoint = A.GetWorldPoint(intersection.A.X, intersection.A.Y);
                 intersections.Add(intersection);
                 list.Add(worldSpacePoint);
                 midIndex = list.Count;
@@ -337,30 +334,30 @@ namespace MG
         }
 
         private static bool GetFirstPoints(IIntersecting a, IIntersecting b, float division, float minimumDifference,
-            int firstPointsCount, List<Vector4> list, float direction, List<Vector4> intersections, ref Vector4 intersection)
+            int firstPointsCount, List<Vector4> list, float direction, List<Intersection> intersections, ref Intersection intersection)
         {
-            try
-            {
-                for (int i = 0; i < firstPointsCount; i++)
-                {
-                    intersection = GetIntersectionPoint(a, b, division, intersection, minimumDifference, direction);
-                    var worldSpacePoint = a.GetWorldPoint(intersection.X, intersection.Y);
-                    intersections.Add(intersection);
-                    list.Add(worldSpacePoint);
-                }
 
-                return false;
+            for (int i = 0; i < firstPointsCount; i++)
+            {
+                if (!GetIntersectionPoint(a, b, division, intersection, minimumDifference, direction,
+                    out var newIntersection))
+                    return true;
+
+                intersection = newIntersection;
+                var worldSpacePoint = a.GetWorldPoint(intersection.A.X, intersection.A.Y);
+                intersections.Add(intersection);
+                list.Add(worldSpacePoint);
             }
-            catch { }
-            return true;
+
+            return false;
         }
 
-        public static Vector4 GetIntersectionPoint(IIntersecting a, IIntersecting b, float division, Vector4 prevIntersection, float minimumDifference, float direction)
+        public static bool GetIntersectionPoint(IIntersecting a, IIntersecting b, float division, Intersection prevIntersection, float minimumDifference, float direction, out Intersection intersection)
         {
-            var normal = a.GetNormalizedWorldNormal(prevIntersection.X, prevIntersection.Y);
-            var otherNormal = b.GetNormalizedWorldNormal(prevIntersection.Z, prevIntersection.W);
+            var normal = a.GetNormalizedWorldNormal(prevIntersection.A.X, prevIntersection.A.Y);
+            var otherNormal = b.GetNormalizedWorldNormal(prevIntersection.B.X, prevIntersection.B.Y);
 
-            var worldSpacePoint = a.GetWorldPoint(prevIntersection.X, prevIntersection.Y);
+            var worldSpacePoint = a.GetWorldPoint(prevIntersection.A.X, prevIntersection.A.Y);
 
             var surfacePoint = new Vector3(worldSpacePoint.X, worldSpacePoint.Y, worldSpacePoint.Z) +
                              direction * division * Vector3.Cross(normal, otherNormal);
@@ -373,17 +370,24 @@ namespace MG
 
             var system = new EquationSystem(f1, f2, f3, minimumDifference != 0);
             var startPoints = new float[]
-                {prevIntersection.X, prevIntersection.Y, prevIntersection.Z, prevIntersection.W, 0, 0};
+                {prevIntersection.A.X, prevIntersection.A.Y, prevIntersection.B.X, prevIntersection.B.Y, 0, 0};
 
-            NewtonRaphsonEquationSolver.Solve(system, startPoints, out var solutions, 10, division * division, out int iterationsUsed);
+            float[] solutions = new float[4];
+            intersection = new Intersection(solutions[0], solutions[1], solutions[2], solutions[3]);
 
-            return new Vector4(solutions[0], solutions[1], solutions[2], solutions[3]);
+            if (!NewtonRaphsonEquationSolver.Solve(system, startPoints, out solutions, 10, division * division,
+                out int iterationsUsed))
+                return false;
+
+            intersection = new Intersection(solutions[0], solutions[1], solutions[2], solutions[3]);
+            return true;
         }
 
 
-        public static bool CheckIntersection(Vector3 p1, Vector3 p2, Vector3 p3, Vector3 edgeStart, Vector3 edgeDirection)
+        public static bool CheckIntersection(Vector3 p1, Vector3 p2, Vector3 p3, Vector3 edgeStart, Vector3 edgeDirection, out IntersectionData intersection)
         {
             var normal = Vector3.Cross(p1 - p2, p3 - p2);
+            intersection = new IntersectionData();
 
             var d = Vector3.Dot(p1 - edgeStart, normal) / Vector3.Dot(edgeDirection, normal);
             if (float.IsNaN(d) || d < 0 || d > 1)
@@ -405,7 +409,10 @@ namespace MG
             var u = 1.0f - v - w;
 
             if (v >= 0 && v <= 1 && u >= 0 && u <= 1 && w >= 0 && w <= 1)
+            {
+                intersection = new IntersectionData(u, v, w, d);
                 return true;
+            }
 
             return false;
         }
@@ -428,14 +435,14 @@ namespace MG
             return closestIndex;
         }
 
-        private static int SelectBestSelfIntersection(List<Vector4> intersectionPoints, List<IntersectionRange> ranges, int closestIndex)
+        private static int SelectBestSelfIntersection(List<Vector4> intersectionPoints, List<Intersection> intersections, int closestIndex)
         {
             float maxDiff = 0;
             for (int i = 0; i < intersectionPoints.Count; i++)
             {
-                var paramRange = ranges[i];
-                var diff = Math.Abs(paramRange.AMinU - paramRange.BMinU) +
-                           Math.Abs(paramRange.AMinV - paramRange.BMinV);
+                var intersection = intersections[i];
+                var diff = Math.Abs(intersection.A.X - intersection.B.X) +
+                           Math.Abs(intersection.A.Y - intersection.B.Y);
 
                 if (diff > maxDiff)
                 {
@@ -447,25 +454,25 @@ namespace MG
             return closestIndex;
         }
 
-        private void GetIntersections(float minimumDifference, out List<IntersectionRange> ranges, out List<Vector4> intersectionPoints)
+        private void GetIntersections(float minimumDifference, out List<Intersection> ranges, out List<Vector4> intersectionPoints)
         {
             var vertices = new List<Vector3>();
             var indices = new List<TriangleIndices>();
-            var parameters = new List<Vector4>();
+            var parameters = new List<TriangleParameters>();
 
             A.GetTriangles(TriangleCount, TriangleCount, parameters, indices, vertices);
 
             var verticesB = new List<Vector3>();
             var indicesB = new List<TriangleIndices>();
-            var parametersB = new List<Vector4>();
+            var parametersB = new List<TriangleParameters>();
 
             B.GetTriangles(TriangleCount, TriangleCount, parametersB, indicesB, verticesB);
 
-            var simpleMesh = new SimpleMesh(indices, vertices, parameters, true, 2 * (float)Math.PI);
-            var meshB = new SimpleMesh(indicesB, verticesB, parametersB, true, 2 * (float)Math.PI);
+            var simpleMesh = new SimpleMesh(indices, vertices, parameters, true, 2 * (float)Math.PI, A);
+            var meshB = new SimpleMesh(indicesB, verticesB, parametersB, true, 2 * (float)Math.PI, B);
             var tree = new KDTree(simpleMesh, meshB, true);
 
-            ranges = new List<IntersectionRange>();
+            ranges = new List<Intersection>();
             intersectionPoints = tree.GetIntersectionPoints(ranges, minimumDifference);
         }
 

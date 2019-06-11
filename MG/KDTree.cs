@@ -19,7 +19,7 @@ namespace MG
             StartingNode = new KDTreeNode(indicesA, indicesB, meshA, meshB, 0, Dimension.X, minValues, maxValues, additionalSplit);
         }
 
-        public List<Vector4> GetIntersectionPoints(List<IntersectionRange> ranges, float minimumDifference = 0)
+        public List<Vector4> GetIntersectionPoints(List<Intersection> ranges, float minimumDifference = 0)
         {
             var intersections = new List<Vector4>();
             StartingNode.GetIntersectionPoints(intersections, ranges, minimumDifference);
@@ -52,7 +52,7 @@ namespace MG
         private List<int>[] _dividedTrianglesA;
         private List<int>[] _dividedTrianglesB;
 
-        public void GetIntersectionPoints(List<Vector4> points, List<IntersectionRange> ranges, float minimumDifference)
+        public void GetIntersectionPoints(List<Vector4> points, List<Intersection> ranges, float minimumDifference)
         {
             if (Smaller != null)
                 Smaller.GetIntersectionPoints(points, ranges, minimumDifference);
@@ -84,10 +84,9 @@ namespace MG
         }
 
         private void GetIntersectionsBetweenTriangles(List<Vector4> points, List<int> triangleIndicesB,
-            List<int> triangleIndicesA, List<IntersectionRange> ranges, float minimumDifference)
+            List<int> triangleIndicesA, List<Intersection> intersections, float minimumDifference)
         {
             var trianglesB = new List<Triangle>();
-            var trianglesBParameterIndices = new List<int>();
 
             var triIndicesB = MeshB.Indices;
             var triVerticesB = MeshB.Points;
@@ -98,7 +97,6 @@ namespace MG
             foreach (var i in triangleIndicesB)
             {
                 var triIndices = triIndicesB[i];
-                trianglesBParameterIndices.Add(triIndices.ParameterIndex);
 
                 trianglesB.Add(new Triangle(
                     triVerticesB[triIndices.A],
@@ -113,42 +111,59 @@ namespace MG
                 var p2 = triVerticesA[triIndices.B];
                 var p3 = triVerticesA[triIndices.C];
 
-                var e1 = new Edge(p1, p2);
-                var e2 = new Edge(p2, p3);
-                var e3 = new Edge(p3, p2);
+                var triangleA = new Triangle(p1, p2, p3);
 
                 for (var j = 0; j < trianglesB.Count; j++)
                 {
+                    var triangleB = trianglesB[j];
+                    if (!triangleA.CheckBoundingBox(triangleB))
+                        continue;
+
+                    var aParam = MeshA.ParameterValues[i];
+                    var bParam = MeshB.ParameterValues[triangleIndicesB[j]];
+
                     if (minimumDifference > 0)
                     {
-                        var myParameter = MeshA.ParameterValues[triIndices.ParameterIndex];
-                        var otherParameter = MeshB.ParameterValues[trianglesBParameterIndices[j]];
+                        var diff = aParam.P1 - bParam.P1;
 
-                        if (Math.Abs(myParameter.X - otherParameter.X) < minimumDifference && Math.Abs(myParameter.Y - otherParameter.Y) < minimumDifference)
+                        if (diff.LengthSquared() < minimumDifference)
                             continue;
                     }
 
-                    var triangleB = trianglesB[j];
-                    if (IntersectionCurve.CheckIntersection(triangleB.A, triangleB.B, triangleB.C, e1.Start,
-                            e1.Direction) ||
-                        IntersectionCurve.CheckIntersection(triangleB.A, triangleB.B, triangleB.C, e3.Start,
-                            e3.Direction) ||
-                        IntersectionCurve.CheckIntersection(triangleB.A, triangleB.B, triangleB.C, e3.Start,
-                            e3.Direction))
+                    if (!CheckIntersection(points, intersections, triangleB, p1, p2, triIndices, aParam.P1, aParam.P2,
+                        bParam))
                     {
-                        var myParameter = MeshA.ParameterValues[triIndices.ParameterIndex];
-                        var otherParameter = MeshB.ParameterValues[trianglesBParameterIndices[j]];
-
-                        ranges.Add(new IntersectionRange(
-                            myParameter,
-                            otherParameter,
-                            MeshA.ParameterPeriodic,
-                            MeshA.ParameterMax));
-                        points.Add(new Vector4(p1, 1));
-                        break;
+                        if (!CheckIntersection(points, intersections, triangleB, p2, p3, triIndices, aParam.P2,
+                            aParam.P3, bParam))
+                        {
+                            if (CheckIntersection(points, intersections, triangleB, p3, p1, triIndices, aParam.P3,
+                                aParam.P1, bParam))
+                                break;
+                        }
+                        else
+                            break;
                     }
+                    else
+                        break;
                 }
             }
+        }
+
+        private bool CheckIntersection(List<Vector4> points, List<Intersection> intersections, Triangle triangleB, Vector3 p1, Vector3 p2,
+            TriangleIndices triIndices, Vector2 myParameterP1, Vector2 myParameterP2, TriangleParameters otherParameter)
+        {
+            if (!IntersectionCurve.CheckIntersection(triangleB.A, triangleB.B, triangleB.C, p1, p2 - p1, out var id))
+                return false;
+
+            var myParams = myParameterP1 * (1 - id.D) + myParameterP2 * id.D;
+            var otherParams = otherParameter.P1 * id.P1 + otherParameter.P2 * id.P2 +
+                              otherParameter.P3 * id.P3;
+
+            var worldPoint = new Vector4(p1 * (1 - id.D) + p2 * id.D, 1);
+            points.Add(worldPoint);
+            intersections.Add(new Intersection(myParams, otherParams));
+
+            return true;
         }
 
         public KDTreeNode(List<int> triangleIndicesA, List<int> triangleIndicesB, SimpleMesh meshA, SimpleMesh meshB, int level, Dimension dimension, Vector3 minValues, Vector3 maxValues, bool additionalSplit)
@@ -161,18 +176,21 @@ namespace MG
             MaxValues = maxValues;
             _additionalSplit = additionalSplit;
 
-            if (triangleIndicesA.LongCount() * triangleIndicesB.Count < ExpectedCount)
-            {
-                MyIndicesA = triangleIndicesA;
-                MyIndicesB = triangleIndicesB;
-            }
-            else
-                PrepareChildNodes(triangleIndicesA, triangleIndicesB, meshA, meshB, level, dimension, minValues, maxValues);
+            MyIndicesA = triangleIndicesA;
+            MyIndicesB = triangleIndicesB;
+
+            if (triangleIndicesA.LongCount() * triangleIndicesB.Count >= ExpectedCount)
+                PrepareChildNodes(triangleIndicesA, triangleIndicesB, meshA, meshB, level, dimension, minValues,
+                    maxValues);
 
             _possibleIntersections = MyIndicesA.Count * MyIndicesB.Count;
 
             if (_possibleIntersections > ExpectedCount * ExpectedCount && _additionalSplit)
+            {
+                MyIndicesA = new List<int>();
+                MyIndicesB = new List<int>();
                 PrepareAdditionalSplit(meshA, meshB, dimension, minValues, maxValues);
+            }
         }
 
         private void PrepareAdditionalSplit(SimpleMesh meshA, SimpleMesh meshB, Dimension dimension, Vector3 minValues,

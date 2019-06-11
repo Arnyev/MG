@@ -7,7 +7,8 @@ namespace MG
     {
         public readonly List<TriangleIndices> Indices;
         public readonly List<Vector3> Points;
-        public readonly List<Vector4> ParameterValues;
+        public readonly List<TriangleParameters> ParameterValues;
+        public readonly IIntersecting Intersecting;
 
         public readonly float MinX = float.MaxValue;
         public readonly float MinY = float.MaxValue;
@@ -23,12 +24,13 @@ namespace MG
         public Vector3 MinValues => new Vector3(MinX, MinY, MinZ);
         public Vector3 MaxValues => new Vector3(MaxX, MaxY, MaxZ);
 
-        public SimpleMesh(List<TriangleIndices> indices, List<Vector3> points, List<Vector4> parameterValues, bool parameterPeriodic, float parameterMax)
+        public SimpleMesh(List<TriangleIndices> indices, List<Vector3> points, List<TriangleParameters> parameterValues, bool parameterPeriodic, float parameterMax, IIntersecting intersecting)
         {
             Indices = indices;
             Points = points;
             ParameterValues = parameterValues;
             ParameterMax = parameterMax;
+            Intersecting = intersecting;
             ParameterPeriodic = parameterPeriodic;
 
             foreach (var pos in points)
@@ -57,14 +59,12 @@ namespace MG
     public struct TriangleIndices
     {
         public readonly int A, B, C;
-        public readonly int ParameterIndex;
 
-        public TriangleIndices(int a, int b, int c, int parameterIndex)
+        public TriangleIndices(int a, int b, int c)
         {
             A = a;
             B = b;
             C = c;
-            ParameterIndex = parameterIndex;
         }
 
         public override string ToString()

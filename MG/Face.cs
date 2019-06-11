@@ -5,66 +5,51 @@ using System.Numerics;
 
 namespace MG
 {
-    public class IntersectionRange
+    public struct Intersection
     {
-        public readonly float AMinU;
-        public readonly float AMaxU;
-        public readonly float AMinV;
-        public readonly float AMaxV;
+        public readonly Vector2 A;
+        public readonly Vector2 B;
 
-        public readonly float BMinU;
-        public readonly float BMaxU;
-        public readonly float BMinV;
-        public readonly float BMaxV;
-        public readonly bool ParametersPeriodic;
-        public readonly float ParameterMax;
-
-        public IntersectionRange(BoundingBox bA, BoundingBox bB, bool parametersPeriodic, float parameterMax)
+        public Intersection(Vector2 a, Vector2 b)
         {
-            AMinU = bA.MinU;
-            AMinV = bA.MinV;
-            AMaxU = bA.MaxU;
-            AMaxV = bA.MaxV;
-
-            BMinU = bB.MinU;
-            BMinV = bB.MinV;
-            BMaxU = bB.MaxU;
-            BMaxV = bB.MaxV;
-            ParametersPeriodic = parametersPeriodic;
-            ParameterMax = parameterMax;
+            A = a;
+            B = b;
         }
 
-
-        public IntersectionRange(Vector4 vA,Vector4 vB, bool parametersPeriodic, float parameterMax)
+        public Intersection(float au, float av, float bu, float bv)
         {
-            AMinU = vA.X;
-            AMinV = vA.Y;
-            AMaxU = vA.Z;
-            AMaxV = vA.W;
-
-            BMinU = vB.X;
-            BMinV = vB.Y;
-            BMaxU = vB.Z;
-            BMaxV = vB.W;
-
-            ParametersPeriodic = parametersPeriodic;
-            ParameterMax = parameterMax;
+            A = new Vector2(au, av);
+            B = new Vector2(bu, bv);
         }
+    }
 
-        public bool IsAdjacent(IntersectionRange other)
+    public struct IntersectionData
+    {
+        public readonly float P1;
+        public readonly float P2;
+        public readonly float P3;
+        public readonly float D;
+
+        public IntersectionData(float p1, float p2, float p3, float d)
         {
-            const float e = 1e-4f;
-            var adjacentAU = Math.Abs(AMinU - other.AMinU) < e || Math.Abs(AMinU - other.AMaxU) < e || Math.Abs(AMaxU - other.AMinU) < e;
-            var adjacentAV = Math.Abs(AMinV - other.AMinV) < e || Math.Abs(AMinV - other.AMaxV) < e || Math.Abs(AMaxV - other.AMinV) < e;
+            P1 = p1;
+            P2 = p2;
+            P3 = p3;
+            D = d;
+        }
+    }
 
-            if (ParametersPeriodic)
-            {
-                adjacentAU |= Math.Abs(AMinU) < e && Math.Abs(other.AMaxU - ParameterMax) < e || Math.Abs(AMaxU - ParameterMax) < e && Math.Abs(other.AMinU) < e;
-                adjacentAV |= Math.Abs(AMinV) < e && Math.Abs(other.AMaxV - ParameterMax) < e || Math.Abs(AMaxV - ParameterMax) < e && Math.Abs(other.AMinV) < e;
-            }
+    public struct TriangleParameters
+    {
+        public readonly Vector2 P1;
+        public readonly Vector2 P2;
+        public readonly Vector2 P3;
 
-            return adjacentAU && adjacentAV;
-            //&& adjacentBU && adjacentBV;
+        public TriangleParameters(Vector2 p1, Vector2 p2, Vector2 p3)
+        {
+            P1 = p1;
+            P2 = p2;
+            P3 = p3;
         }
     }
 
@@ -148,6 +133,16 @@ namespace MG
         public float MinX => (A.X <= B.X && A.X <= C.X) ? A.X : (B.X <= C.X) ? B.X : C.X;
         public float MinY => (A.Y <= B.Y && A.Y <= C.Y) ? A.Y : (B.Y <= C.Y) ? B.Y : C.Y;
         public float MinZ => (A.Z <= B.Z && A.Z <= C.Z) ? A.Z : (B.Z <= C.Z) ? B.Z : C.Z;
+
+        public bool CheckBoundingBox(Triangle other)
+        {
+            if (MaxX < other.MinX || MinX > other.MaxX ||
+                MaxY < other.MinY || MinY > other.MaxY ||
+                MaxZ < other.MinZ || MinZ > other.MaxZ)
+                return false;
+
+            return true;
+        }
 
         public override string ToString()
         {

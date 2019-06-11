@@ -8,6 +8,7 @@ using System.Linq;
 using System.Numerics;
 using System.Text;
 using System.Windows.Forms;
+using System.Windows.Media.Effects;
 
 namespace MG
 {
@@ -56,10 +57,42 @@ namespace MG
             panel.Controls.Add(GetButton("Match points", MatchPoints));
             panel.Controls.Add(GetButton("Insert patch", InsertPatch));
             panel.Controls.Add(GetButton("Add Intersecting Curve", AddIntersectingCurve));
+            panel.Controls.Add(GetButton("Draw Curve Params", DrawCurveParams));
             panel.Controls.Add(GetButton("Trim", Trim));
             panel.Controls.Add(GetButton("Serialize", Serialize));
             panel.Controls.Add(GetButton("Deserialize", Deserialize));
             panel.Controls.Add(GetButton("Delete object", DeleteObject));
+        }
+
+        public void DrawCurveParams()
+        {
+            var intersectingCurves = _listBox.Items.OfType<IntersectionCurve>().Where(x => x.Selected).ToList();
+            if (intersectingCurves.Count != 1)
+                return;
+
+            var curve = intersectingCurves[0];
+
+            var size = 500;
+
+            List<Vector2> paramsA = new List<Vector2>();
+            curve.GetPoints(out paramsA);
+            var nc = new IntersectionCurve(curve.B, curve.A, _cursor);
+
+            List<Vector2> paramsB = new List<Vector2>();
+            nc.GetPoints(out paramsB);
+
+            var bitmap1 = new DirectBitmap(size, size);
+            var bitmap2 = new DirectBitmap(size, size);
+
+            curve.A.DrawCurve(paramsA, bitmap1);
+            curve.B.DrawCurve(paramsB, bitmap2);
+
+            var form = new Form() {Size = new Size(2 * size, size)};
+
+            form.Controls.Add(new PictureBox { Size = new Size(size, size), Image = bitmap1.Bitmap });
+            form.Controls.Add(new PictureBox { Size = new Size(size, size), Location = new Point(size, 0), Image = bitmap2.Bitmap });
+
+            form.ShowDialog();
         }
 
         public void Trim()

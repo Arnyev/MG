@@ -4,12 +4,14 @@ namespace MG
 {
     internal class MatrixCalculationHelper
     {
-        public static void InverseMatrix(float[][] matrix, out float[][] inversed)
+        public static bool InverseMatrix(float[][] matrix, out float[][] inversed)
         {
             int length = matrix.Length;
             inversed = new float[length][];
             float[][] numArray = CopyMatrix(matrix);
-            LuExpansion(length, ref numArray, ref numArray, out int[] rc);
+            if (!LuExpansion(length, ref numArray, ref numArray, out int[] rc))
+                return false;
+
             int max = length - 1;
             float[] a = new float[length];
             for (int i = 0; i < length; ++i)
@@ -22,6 +24,8 @@ namespace MG
                 BackPassage(length, numArray, a, out inversed[i]);
             }
             SelfTranspose(max, ref inversed);
+
+            return true;
         }
 
         private static int[] Numbers(int len)
@@ -32,7 +36,7 @@ namespace MG
             return numArray;
         }
 
-        private static void LuExpansion(int len, ref float[][] m, ref float[][] lu, out int[] rc)
+        private static bool LuExpansion(int len, ref float[][] m, ref float[][] lu, out int[] rc)
         {
             rc = Numbers(len);
             int num1 = len - 1;
@@ -50,8 +54,10 @@ namespace MG
                             break;
                         }
                     }
+
                     if (index2 < 0)
-                        throw new ArgumentException();
+                        return false;
+
                     if (index2 != row)
                     {
                         float[] numArray = m[row];
@@ -68,6 +74,8 @@ namespace MG
                     lu[index2][row] = num2;
                 }
             }
+
+            return true;
         }
 
         private static void BackPassage(int len, float[][] m, float[] a, out float[] x)

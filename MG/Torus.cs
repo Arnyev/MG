@@ -8,13 +8,14 @@ namespace MG
 {
     public interface IIntersecting
     {
-        void GetTriangles(int divisionsU, int divisionsV, List<Vector4> parameterValues, List<TriangleIndices> indices,
+        void GetTriangles(int divisionsU, int divisionsV, List<TriangleParameters> parameterValues, List<TriangleIndices> indices,
             List<Vector3> points);
 
         Vector4 GetWorldPoint(float u, float v);
         Vector3 GetNormalizedWorldNormal(float u, float v);
         bool Selected { get; }
         void Trim(List<Vector2> parameters);
+        void DrawCurve(List<Vector2> parameters, DirectBitmap bitmap);
     }
 
     public class Torus : IDrawableObject, IIntersecting
@@ -143,7 +144,7 @@ namespace MG
             return boundingBoxes;
         }
 
-        public void GetTriangles(int divisionsU, int divisionsV, List<Vector4> parameterValues, List<TriangleIndices> indices, List<Vector3> points)
+        public void GetTriangles(int divisionsU, int divisionsV, List<TriangleParameters> parameterValues, List<TriangleIndices> indices, List<Vector3> points)
         {
             var modelMatrix = GetModelMatrix();
 
@@ -175,8 +176,6 @@ namespace MG
                     var xp = (float)(mult * cosb);
                     var yp = (float)(mult * sinb);
 
-                    parameterValues.Add(new Vector4(alpha, beta, alpha + diffa, beta + diffb));
-
                     points.Add(Vector3.Transform(new Vector3(xp, yp, zp), modelMatrix));
 
                     var i = x * divisionsV + y;
@@ -185,8 +184,19 @@ namespace MG
                     var indUp = (i + divisionsV) % pointCount;
                     var indCross = (i + 1 + divisionsV) % pointCount;
 
-                    indices.Add(new TriangleIndices(i, indRight, indUp, parameterValues.Count - 1));
-                    indices.Add(new TriangleIndices(indRight, indCross, indUp, parameterValues.Count - 1));
+                    parameterValues.Add(new TriangleParameters(
+                        new Vector2(alpha, beta),
+                        new Vector2(alpha, beta + diffb),
+                        new Vector2(alpha + diffa, beta)));
+
+                    indices.Add(new TriangleIndices(i, indRight, indUp));
+
+                    parameterValues.Add(new TriangleParameters(
+                        new Vector2(alpha, beta + diffb),
+                        new Vector2(alpha + diffa, beta + diffb),
+                        new Vector2(alpha + diffa, beta)));
+
+                    indices.Add(new TriangleIndices(indRight, indCross, indUp));
                 }
             }
         }
@@ -278,6 +288,20 @@ namespace MG
 
         public void Trim(List<Vector2> parameters)
         {
+        }
+
+        public void DrawCurve(List<Vector2> parameters, DirectBitmap bitmap)
+        {
+            var mult = (int)((bitmap.Width - 5) / Math.PI * 2);
+            var m = bitmap.Width;
+            var lines = parameters.Select(x => new Point((int)(x.X * mult), (int)(x.Y * mult))).ToList();
+            var lines2 = lines.Select(x => new Point(((x.X % m) + m) % m, ((x.Y % m) + m) % m)).ToList();
+
+            var myColor = new MyColor(255, 255, 255);
+
+            var lines3 = lines2.Zip(lines2.Skip(1), (x, y) => Tuple.Create(x, y)).ToList();
+
+            lines3.ForEach(x => bitmap.DrawLine(x.Item1, x.Item2, myColor, false));
         }
     }
 

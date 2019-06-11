@@ -221,7 +221,7 @@ namespace MG
             set => _points.ForEach(x => x.Selected = value);
         }
 
-        public void GetTriangles(int divisionsU, int divisionsV, List<Vector4> parameterValues, List<TriangleIndices> indices, List<Vector3> points)
+        public void GetTriangles(int divisionsU, int divisionsV, List<TriangleParameters> parameterValues, List<TriangleIndices> indices, List<Vector3> points)
         {
             var startU = 3;
             var startV = _isTube ? 0 : 3;
@@ -271,10 +271,9 @@ namespace MG
                             point += deBoorPoints[i * 4 + j] * valuesU[ui, i] * valuesV[vi, j];
 
                     points.Add(new Vector3(point.X, point.Y, point.Z));
-                    var u = patchU + (float)ui / (pointsPerPathU - 1);
-                    var v = patchV + (float)vi / (pointsPerPathV - 1);
 
-                    parameterValues.Add(new Vector4(u, v, u + diffU, v + diffV));
+                    var u = patchU + ui * diffU;
+                    var v = patchV + vi * diffV;
 
                     if (indexU != maxU - 1 && (_isTube || indexV != maxV - 1))
                     {
@@ -283,8 +282,20 @@ namespace MG
                         var ind3 = (ind + maxV) % pointCount;
                         var ind4 = (ind + maxV + 1) % pointCount;
 
-                        indices.Add(new TriangleIndices(ind, ind2, ind3, parameterValues.Count - 1));
-                        indices.Add(new TriangleIndices(ind2, ind4, ind3, parameterValues.Count - 1));
+                        parameterValues.Add(new TriangleParameters(
+                            new Vector2(u, v),
+                            new Vector2(u, v + diffV),
+                            new Vector2(u + diffU, v)));
+
+
+                        parameterValues.Add(new TriangleParameters(
+                            new Vector2(u, v + diffV),
+                            new Vector2(u + diffU, v + diffV),
+                            new Vector2(u + diffU, v)));
+
+
+                        indices.Add(new TriangleIndices(ind, ind2, ind3));
+                        indices.Add(new TriangleIndices(ind2, ind4, ind3));
                     }
                 }
         }
@@ -323,7 +334,7 @@ namespace MG
                 }
                 else
                 {
-                    patchV = (int) v;
+                    patchV = (int)v;
                     v = v - patchV;
                 }
             }
@@ -376,6 +387,23 @@ namespace MG
 
             ScanLineAlgorithm.FillPolygon(ParameterRange, points);
             Trimmed = true;
+        }
+
+        public void DrawCurve(List<Vector2> parameters, DirectBitmap bitmap)
+        {
+            var multU = (int)((bitmap.Width - 5) / (float)(_countU - 3));
+            var multV = (int)((bitmap.Width - 5) / (float)(_countV - (_isTube ? 0 : 3)));
+
+            var m = bitmap.Width;
+            var m = bitmap.Width;
+            var lines = parameters.Select(x => new Point((int)(x.X * multU), (int)(x.Y * multV))).ToList();
+            var lines2 = lines.Select(x => new Point(((x.X % m) + m) % m, ((x.Y % m) + m) % m)).ToList();
+
+            var myColor = new MyColor(255, 255, 255);
+
+            var lines3 = lines2.Zip(lines2.Skip(1), (x, y) => Tuple.Create(x, y)).ToList();
+
+            lines3.ForEach(x => bitmap.DrawLine(x.Item1, x.Item2, myColor, false));
         }
 
         public Vector3 GetNormalizedWorldNormal(float u, float v)
