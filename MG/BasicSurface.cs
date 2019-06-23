@@ -728,18 +728,26 @@ namespace MG
 
         public void DrawCurve(List<Vector2> parameters, DirectBitmap bitmap)
         {
-            var multU = (int)((bitmap.Width - 5) / (float)_countU);
-            var multV = (int)((bitmap.Width - 5) / (float)_countV);
-
             var m = bitmap.Width;
-            var lines = parameters.Select(x => new Point((int)(x.X * multU), (int)(x.Y * multV))).ToList();
-            var lines2 = lines.Select(x => new Point(((x.X % m) + m) % m, ((x.Y % m) + m) % m)).ToList();
+            var multU = bitmap.Width / (float)_countU;
+            var multV = bitmap.Width / (float)_countV;
+            var points = parameters.Select(x => new Point((int)(x.X * multU), (int)(x.Y * multV))).ToList();
+            var pointsClamped = points.Select(x => new Point(((x.X % m) + m) % m, ((x.Y % m) + m) % m)).ToList();
 
             var myColor = new MyColor(255, 255, 255);
 
-            var lines3 = lines2.Zip(lines2.Skip(1), (x, y) => Tuple.Create(x, y)).ToList();
+            var lines = pointsClamped.Zip(pointsClamped.Skip(1), (x, y) => Tuple.Create(x, y))
+                                .Where(x => (x.Item1.X - x.Item2.X) * (x.Item1.X - x.Item2.X) + (x.Item1.Y - x.Item2.Y) * (x.Item1.Y - x.Item2.Y) < 30)
+                                .ToList();
 
-            lines3.ForEach(x => bitmap.DrawLine(x.Item1, x.Item2, myColor, false));
+            lines.ForEach(x => bitmap.DrawLine(x.Item1, x.Item2, myColor, false));
+        }
+
+        public void InverseTrimming()
+        {
+            for (int i = 0; i < ParameterRangePrecision + 1; i++)
+                for (int j = 0; j < ParameterRangePrecision + 1; j++)
+                    ParameterRange[i, j] = !ParameterRange[i, j];
         }
 
         public Vector3 GetNormalizedWorldNormal(float u, float v)

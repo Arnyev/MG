@@ -144,7 +144,7 @@ namespace MG
             }
         }
 
-        private static int FindOctant(Point end)
+        public static int FindOctant(Point end)
         {
             var dx = end.X;
             var dy = -end.Y;
@@ -161,7 +161,7 @@ namespace MG
             return -dy > dx ? 6 : 7;
         }
 
-        private static Point MapInput(int octant, int x, int y)
+        public static Point MapInput(int octant, int x, int y)
         {
             switch (octant)
             {
@@ -178,7 +178,7 @@ namespace MG
             return new Point();
         }
 
-        private static Point MapOutput(int octant, int x, int y)
+        public static Point MapOutput(int octant, int x, int y)
         {
             switch (octant)
             {

@@ -391,19 +391,19 @@ namespace MG
 
         public void DrawCurve(List<Vector2> parameters, DirectBitmap bitmap)
         {
-            var multU = (int)((bitmap.Width - 5) / (float)(_countU - 3));
-            var multV = (int)((bitmap.Width - 5) / (float)(_countV - (_isTube ? 0 : 3)));
-
             var m = bitmap.Width;
-            var m = bitmap.Width;
-            var lines = parameters.Select(x => new Point((int)(x.X * multU), (int)(x.Y * multV))).ToList();
-            var lines2 = lines.Select(x => new Point(((x.X % m) + m) % m, ((x.Y % m) + m) % m)).ToList();
+            var multU = bitmap.Width / (float)(_countU - 3);
+            var multV = bitmap.Width / (float)(_countV - (_isTube ? 0 : 3));
+            var points = parameters.Select(x => new Point((int)(x.X * multU), (int)(x.Y * multV))).ToList();
+            var pointsClamped = points.Select(x => new Point(((x.X % m) + m) % m, ((x.Y % m) + m) % m)).ToList();
 
             var myColor = new MyColor(255, 255, 255);
 
-            var lines3 = lines2.Zip(lines2.Skip(1), (x, y) => Tuple.Create(x, y)).ToList();
+            var lines = pointsClamped.Zip(pointsClamped.Skip(1), (x, y) => Tuple.Create(x, y))
+                                .Where(x => (x.Item1.X - x.Item2.X) * (x.Item1.X - x.Item2.X) + (x.Item1.Y - x.Item2.Y) * (x.Item1.Y - x.Item2.Y) < 30)
+                                .ToList();
 
-            lines3.ForEach(x => bitmap.DrawLine(x.Item1, x.Item2, myColor, false));
+            lines.ForEach(x => bitmap.DrawLine(x.Item1, x.Item2, myColor, false));
         }
 
         public Vector3 GetNormalizedWorldNormal(float u, float v)
@@ -420,6 +420,13 @@ namespace MG
             var v2 = new Vector3(d2.X, d2.Y, d2.Z);
 
             return Vector3.Normalize(Vector3.Cross(v1, v2));
+        }
+
+        public void InverseTrimming()
+        {
+            for (int i = 0; i < ParameterRangePrecision + 1; i++)
+                for (int j = 0; j < ParameterRangePrecision + 1; j++)
+                    ParameterRange[i, j] = !ParameterRange[i, j];
         }
     }
 }

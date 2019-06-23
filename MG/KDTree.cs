@@ -183,7 +183,7 @@ namespace MG
                 PrepareChildNodes(triangleIndicesA, triangleIndicesB, meshA, meshB, level, dimension, minValues,
                     maxValues);
 
-            _possibleIntersections = MyIndicesA.Count * MyIndicesB.Count;
+            _possibleIntersections = MyIndicesA.LongCount() * MyIndicesB.Count;
 
             if (_possibleIntersections > ExpectedCount * ExpectedCount && _additionalSplit)
             {

@@ -59,9 +59,19 @@ namespace MG
             panel.Controls.Add(GetButton("Add Intersecting Curve", AddIntersectingCurve));
             panel.Controls.Add(GetButton("Draw Curve Params", DrawCurveParams));
             panel.Controls.Add(GetButton("Trim", Trim));
+            panel.Controls.Add(GetButton("Inverse trimming", InverseTrimming));
             panel.Controls.Add(GetButton("Serialize", Serialize));
             panel.Controls.Add(GetButton("Deserialize", Deserialize));
             panel.Controls.Add(GetButton("Delete object", DeleteObject));
+        }
+
+        private void InverseTrimming()
+        {
+            var intersectingObjects = _listBox.Items.OfType<IIntersecting>().Where(x => x.Selected).ToList();
+            if (intersectingObjects.Count != 1)
+                return;
+
+            intersectingObjects[0].InverseTrimming();
         }
 
         public void DrawCurveParams()
@@ -84,13 +94,13 @@ namespace MG
             var bitmap1 = new DirectBitmap(size, size);
             var bitmap2 = new DirectBitmap(size, size);
 
-            curve.A.DrawCurve(paramsA, bitmap1);
-            curve.B.DrawCurve(paramsB, bitmap2);
-
-            var form = new Form() {Size = new Size(2 * size, size)};
+            var form = new Form() { Size = new Size(2 * size + 50, size + 50) };
 
             form.Controls.Add(new PictureBox { Size = new Size(size, size), Image = bitmap1.Bitmap });
             form.Controls.Add(new PictureBox { Size = new Size(size, size), Location = new Point(size, 0), Image = bitmap2.Bitmap });
+
+            curve.A.DrawCurve(paramsA, bitmap1);
+            curve.B.DrawCurve(paramsB, bitmap2);
 
             form.ShowDialog();
         }

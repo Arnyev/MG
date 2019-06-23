@@ -8,14 +8,13 @@ namespace MG
 {
     public interface IIntersecting
     {
-        void GetTriangles(int divisionsU, int divisionsV, List<TriangleParameters> parameterValues, List<TriangleIndices> indices,
-            List<Vector3> points);
-
+        void GetTriangles(int divisionsU, int divisionsV, List<TriangleParameters> parameterValues, List<TriangleIndices> indices, List<Vector3> points);
         Vector4 GetWorldPoint(float u, float v);
         Vector3 GetNormalizedWorldNormal(float u, float v);
         bool Selected { get; }
         void Trim(List<Vector2> parameters);
         void DrawCurve(List<Vector2> parameters, DirectBitmap bitmap);
+        void InverseTrimming();
     }
 
     public class Torus : IDrawableObject, IIntersecting
@@ -33,6 +32,18 @@ namespace MG
         public string Name { get; set; } = "Torus " + _torusNumber++;
         public int PointCountH { get; set; } = 30;
         public int PointCountV { get; set; } = 30;
+        private const int ParameterRangePrecision = 1000;
+        public bool Trimmed { get; set; }
+        private readonly bool[,] ParameterRange;
+
+        public Torus()
+        {
+            ParameterRange = new bool[ParameterRangePrecision + 1, ParameterRangePrecision + 1];
+            for (int i = 0; i < ParameterRangePrecision + 1; i++)
+                for (int j = 0; j < ParameterRangePrecision + 1; j++)
+                    ParameterRange[i, j] = true;
+        }
+
 
         public Matrix4x4 GetModelMatrix()
         {
@@ -100,8 +111,13 @@ namespace MG
             var points2Dim = GetPoints();
             var lines = new Line[PointCountH * PointCountV * 2];
             var points = new Vector4[PointCountH * PointCountV];
+            var multInd = (int)(ParameterRangePrecision / (Math.PI * 2));
 
             var ind = 0;
+
+            var diffa = 2 * (float)Math.PI / points2Dim.GetLength(0);
+            var diffb = 2 * (float)Math.PI / points2Dim.GetLength(1);
+
             for (int i = 0; i < points2Dim.GetLength(0); i++)
                 for (int j = 0; j < points2Dim.GetLength(1); j++)
                 {
@@ -119,8 +135,17 @@ namespace MG
                     else
                         nextIndY -= PointCountV - 1;
 
-                    lines[2 * ind] = new Line(ind, nextIndX);
-                    lines[2 * ind + 1] = new Line(ind, nextIndY);
+                    var alpha = i * diffa;
+                    var beta = j * diffb;
+
+                    var indX = (int)(alpha * multInd);
+                    var indY = (int)(beta * multInd);
+                    if (!Trimmed || ParameterRange[indX, indY])
+                    {
+
+                        lines[2 * ind] = new Line(ind, nextIndX);
+                        lines[2 * ind + 1] = new Line(ind, nextIndY);
+                    }
 
                     ind++;
                 }
@@ -288,20 +313,111 @@ namespace MG
 
         public void Trim(List<Vector2> parameters)
         {
+            Trimmed = true;
+            var m = ParameterRangePrecision;
+            var mult = (int)(m / (Math.PI * 2));
+            var points = parameters.Select(x => new Point((int)(x.X * mult), (int)(x.Y * mult))).ToList();
+            var pointsClamped = points.Select(x => new Point(((x.X % m) + m) % m, ((x.Y % m) + m) % m)).ToList();
+            var lines = pointsClamped.Zip(pointsClamped.Skip(1), (x, y) => Tuple.Create(x, y))
+                    .Where(x => (x.Item1.X - x.Item2.X) * (x.Item1.X - x.Item2.X) + (x.Item1.Y - x.Item2.Y) * (x.Item1.Y - x.Item2.Y) < 10).ToList();
+
+            lines.ForEach(x => DrawLine(x.Item1, x.Item2));
+
+            var stack = new Stack<Point>();
+            var rand = new Random();
+            int xi = 0;
+            int yi = 0;
+            while (!ParameterRange[xi, yi])
+            {
+                xi = rand.Next(m);
+                yi = rand.Next(m);
+            }
+            stack.Push(new Point(xi, yi));
+            ParameterRange[xi, yi] = false;
+            int pushed = 0;
+            while (stack.Count != 0)
+            {
+                var p = stack.Pop();
+                var right = (p.X + 1) % m;
+                var left = (p.X - 1 + m) % m;
+                var top = (p.Y + 1) % m;
+                var bot = (p.Y - 1 + m) % m;
+
+                pushed += 1;
+                if (ParameterRange[right, p.Y])
+                {
+                    ParameterRange[right, p.Y] = false;
+                    stack.Push(new Point(right, p.Y));
+                }
+                if (ParameterRange[left, p.Y])
+                {
+                    ParameterRange[left, p.Y] = false;
+                    stack.Push(new Point(left, p.Y));
+                }
+                if (ParameterRange[p.X, top])
+                {
+                    ParameterRange[p.X, top] = false;
+                    stack.Push(new Point(p.X, top));
+                }
+                if (ParameterRange[p.X, bot])
+                {
+                    ParameterRange[p.X, bot] = false;
+                    stack.Push(new Point(p.X, bot));
+                }
+            }
+        }
+
+        public void DrawLine(Point p1, Point p2)
+        {
+            var differencePoint = new Point(p2.X - p1.X, p2.Y - p1.Y);
+            var octant = DirectBitmap.FindOctant(differencePoint);
+
+            var mappedDifference = DirectBitmap.MapInput(octant, differencePoint.X, differencePoint.Y);
+
+            var dx = mappedDifference.X;
+            var dy = mappedDifference.Y;
+            var d = 2 * dy - dx;
+            var y = 0;
+
+            for (int x = 0; x <= mappedDifference.X; x++)
+            {
+                var p = DirectBitmap.MapOutput(octant, x, y);
+                var newPointX = p.X + p1.X;
+                var newPointY = p.Y + p1.Y;
+
+                if (newPointX >= 0 && newPointX < ParameterRangePrecision && newPointY >= 0 && newPointY < ParameterRangePrecision)
+                    ParameterRange[newPointX, newPointY] = false;
+
+                if (d > 0)
+                {
+                    y = y + 1;
+                    d = d - 2 * dx;
+                }
+
+                d = d + 2 * dy;
+            }
         }
 
         public void DrawCurve(List<Vector2> parameters, DirectBitmap bitmap)
         {
-            var mult = (int)((bitmap.Width - 5) / Math.PI * 2);
             var m = bitmap.Width;
-            var lines = parameters.Select(x => new Point((int)(x.X * mult), (int)(x.Y * mult))).ToList();
-            var lines2 = lines.Select(x => new Point(((x.X % m) + m) % m, ((x.Y % m) + m) % m)).ToList();
+            var mult = (int)(m / (Math.PI * 2));
+            var points = parameters.Select(x => new Point((int)(x.X * mult), (int)(x.Y * mult))).ToList();
+            var pointsClamped = points.Select(x => new Point(((x.X % m) + m) % m, ((x.Y % m) + m) % m)).ToList();
 
             var myColor = new MyColor(255, 255, 255);
 
-            var lines3 = lines2.Zip(lines2.Skip(1), (x, y) => Tuple.Create(x, y)).ToList();
+            var lines = pointsClamped.Zip(pointsClamped.Skip(1), (x, y) => Tuple.Create(x, y))
+                .Where(x => (x.Item1.X - x.Item2.X) * (x.Item1.X - x.Item2.X) + (x.Item1.Y - x.Item2.Y) * (x.Item1.Y - x.Item2.Y) < 30).ToList();
 
-            lines3.ForEach(x => bitmap.DrawLine(x.Item1, x.Item2, myColor, false));
+            lines.ForEach(x => bitmap.DrawLine(x.Item1, x.Item2, myColor, false));
+        }
+
+        public void InverseTrimming()
+        {
+            for (int i = 0; i < ParameterRangePrecision + 1; i++)
+                for (int j = 0; j < ParameterRangePrecision + 1; j++)
+                    ParameterRange[i, j] = !ParameterRange[i, j];
         }
     }
 

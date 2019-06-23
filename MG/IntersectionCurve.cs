@@ -10,7 +10,9 @@ namespace MG
     {
         public readonly IIntersecting A;
         public readonly IIntersecting B;
+
         private readonly Vector4 cursor;
+        public bool UseTriangulation { get; set; }
 
         public float Division { get; set; } = 0.01f;
         public int TriangleCount { get; set; } = 40;
@@ -211,8 +213,10 @@ namespace MG
 
             var standardOk = TryStandardFirstPoints(minimumDifference, firstPointsCount, list, intersections, intersectionsTriangulation, ref intersection);
 
-            if (!standardOk)
+            if (UseTriangulation)
                 return TriangulationPoints(ref parameterValues, intersectionsTriangulation);
+            if (!standardOk)
+                return list;
 
             var expectedSuccedingDifference = Division / 4;
             var midIndex = AddRestOfPoints(list, expectedSuccedingDifference, intersection, minimumDifference, 1, intersections);
@@ -256,13 +260,13 @@ namespace MG
 
         private List<Vector4> TriangulationPoints(ref List<Vector2> parameterValues, List<Intersection> ranges)
         {
-            if (A != B)
-            {
-                parameterValues = ComputeApproximatingPoints(ranges, A, out var drawingPoints);
-                return drawingPoints;
-            }
-            else
-                return new List<Vector4>();
+            //    if (A != B)
+            //    {
+            parameterValues = ComputeApproximatingPoints(ranges, A, out var drawingPoints);
+            return drawingPoints;
+            //}
+            //else
+            //    return new List<Vector4>();
         }
 
         private bool TryStandardFirstPoints(float minimumDifference, int firstPointsCount, List<Vector4> list, List<Intersection> intersections,
