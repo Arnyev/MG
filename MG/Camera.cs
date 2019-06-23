@@ -10,14 +10,16 @@ namespace MG
         private readonly PictureBox _box;
         private readonly MainForm _mainForm;
         private static readonly Vector3 Up = new Vector3(0, 1, 0);
-        private const float MovementSpeed = 20.0f;
+        private const float MovementSpeed = 4.0f;
         private const float MouseSensitivity = 0.0005f;
-        private Vector3 _position = new Vector3(0, 0, -10);
+        private Vector3 _position = new Vector3(10, 0, 0);
         private DateTime _lastComputationTime;
         private int _wPressed;
         private int _sPressed;
         private int _aPressed;
         private int _dPressed;
+        private int _qPressed;
+        private int _ePressed;
         private float _pitchRotation;
         private float _yawRotation;
         private Vector3 CurrentDirection
@@ -99,6 +101,12 @@ namespace MG
                 case Keys.W:
                     _wPressed = valueUpDown;
                     break;
+                case Keys.Q:
+                    _qPressed = valueUpDown;
+                    break;
+                case Keys.E:
+                    _ePressed = valueUpDown;
+                    break;
             }
         }
 
@@ -115,6 +123,7 @@ namespace MG
 
             _position += durationScaled * zaxis * (_wPressed - _sPressed);
             _position += durationScaled * xaxis * (_aPressed - _dPressed);
+            _position += durationScaled * Up * (_qPressed - _ePressed);
         }
 
         private void Box_MouseMove(object sender, MouseEventArgs e)

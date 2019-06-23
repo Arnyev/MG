@@ -49,7 +49,7 @@ namespace MG
                 Name = l[3];
 
             float x = 0, y = 0, z = 0;
-            if (!float.TryParse(l[0], NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out x))
+            if (!float.TryParse(l[0], NumberStyles.AllowDecimalPoint| NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out x))
                 float.TryParse(l[0], out x);
 
             if (!float.TryParse(l[1], NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out y))

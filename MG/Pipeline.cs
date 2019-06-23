@@ -208,14 +208,15 @@ namespace MG
                     continue;
 
                 var points = linesToDraw.Select(x => x.Item1).Concat(linesToDraw.Select(x => x.Item2)).ToList();
-                var minX = points.Min(p => p.X);
-                var maxX = points.Max(p => p.X);
-                var minY = points.Min(p => p.Y);
-                var maxY = points.Max(p => p.Y);
-                var count = (int)(maxX - minX + maxY - minY);
+                var minX = points.Select(p => p.X).Min(Clamp);
+                var maxX = points.Select(p => p.X).Max(Clamp);
+                var minY = points.Select(p => p.Y).Min(Clamp);
+                var maxY = points.Select(p => p.Y).Max(Clamp);
 
-                if (count > _bitmap.Width + _bitmap.Height)
-                    count = _bitmap.Width + _bitmap.Height;
+                var count = maxX - minX + maxY - minY;
+                               
+                if (count == 0)
+                    continue;
 
                 var pointsToDraw = curve.GetPoints(count);
 
@@ -223,6 +224,18 @@ namespace MG
             }
 
             DrawPoints(color, matrixViewProj, viewportMatrix);
+        }
+
+        private int Clamp(float val)
+        {
+            if (float.IsNaN(val))
+                val = 0;
+            if (val < 0)
+                val = 0;
+            if (val > _bitmap.Width)
+                val = _bitmap.Width;
+
+            return (int)val;
         }
 
         private List<Tuple<Vector4, Vector4, bool>> GetLinesToDraw(Matrix4x4 perspectiveMatrix, Vector4[] pointsLines,

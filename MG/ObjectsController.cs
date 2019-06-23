@@ -254,7 +254,17 @@ namespace MG
                         break;
                     case "surfaceC0":
                         for (int j = 0; j < expected; j++, i++)
-                            _listBox.Items.Add(new BasicSurface(lines[i], false));
+                        {
+                            var surf = new BasicSurface(lines[i], false);
+                            //if (surf.Name == "ucho")
+                            //{
+                            //    var surf2 = new BasicSurface(lines[i], false);
+                            //    surf2.Points.ToList().ForEach(x => x.X = -x.X);
+                            //    surf2.Name = "ucho2";
+                            //    _listBox.Items.Add(surf2);
+                            //}
+                            _listBox.Items.Add(surf);
+                        }
                         break;
                     case "tubeC0":
                         for (int j = 0; j < expected; j++, i++)
@@ -262,11 +272,55 @@ namespace MG
                         break;
                     case "surfaceC2":
                         for (int j = 0; j < expected; j++, i++)
-                            _listBox.Items.Add(new BSplineSurface(lines[i], false));
+                        {
+                            var surf = new BSplineSurface(lines[i], false);
+                            _listBox.Items.Add(surf);
+                        }
                         break;
                     case "tubeC2":
                         for (int j = 0; j < expected; j++, i++)
-                            _listBox.Items.Add(new BSplineSurface(lines[i], true));
+                        {
+                            var surf = new BSplineSurface(lines[i], true);
+                            if (surf.Name == "noga1")
+                            {
+                                //var surf2 = new BSplineSurface(lines[i], true);
+                                //surf2.Points.ToList().ForEach(x => x.X = -x.X);
+                                //surf2.Name = "noga3";
+                                //_listBox.Items.Add(surf2);
+                            }
+                            else if (surf.Name == "noga2")
+                            {
+                                //var surf2 = new BSplineSurface(lines[i], true);
+                                //surf2.Points.ToList().ForEach(x => x.X = -x.X);
+                                //surf2.Name = "noga4";
+                                //_listBox.Items.Add(surf2);
+                            }
+                            else
+                            {
+                                // var points = surf.Points.ToList();
+
+                                // //for(int k=0;k<points.Count;k++)
+                                // //{
+                                // //    var p = points[k];
+                                // //    var p2 = points[k+2];
+                                // //    points[k + 2].Point = new Vector4(-p.X, p2.Y, p.Z, 1);
+                                // //    if (k % 4 == 1)
+                                // //        k += 2;
+                                // //}
+
+                                // var bigX = points.Where(x => x.X  >0).ToList();
+                                // foreach(var p in bigX)
+                                // {
+                                //     var mirror = new Vector4(-p.X, p.Y, p.Z, 1);
+                                //     var matched = points.OrderBy(x => Vector4.DistanceSquared(x.Point, mirror)).ToList();
+                                //     var best = matched.First();
+                                //     best.Point = mirror;
+                                //     if (best == p)
+                                //         p.X = 0;
+                                // }
+                            }
+                            _listBox.Items.Add(surf);
+                        }
                         break;
                     default:
                         break;
